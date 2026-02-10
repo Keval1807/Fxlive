@@ -4,12 +4,12 @@ const CONFIG = {
     USE_PUTER_AI: true,
     
     RSS_FEEDS: [
-        // Forex News Feeds
+        // Forex News Feeds - Most Reliable
+        { name: 'ForexLive', url: 'https://www.forexlive.com/feed/news', category: 'forex', type: 'forex' },
         { name: 'FXStreet', url: 'https://www.fxstreet.com/rss/news', category: 'forex', type: 'forex' },
         { name: 'DailyFX', url: 'https://www.dailyfx.com/feeds/market-news', category: 'forex', type: 'forex' },
-        { name: 'Investing.com', url: 'https://www.investing.com/rss/news.rss', category: 'forex', type: 'forex' },
-        { name: 'ForexLive', url: 'https://www.forexlive.com/feed/news', category: 'forex', type: 'forex' },
-        { name: 'Investing.live', url: 'https://investinglive.com/live-feed', category: 'forex', type: 'forex' },
+        { name: 'Investing.com Forex', url: 'https://www.investing.com/rss/news_25.rss', category: 'forex', type: 'forex' },
+        { name: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/marketpulse/', category: 'forex', type: 'forex' },
         
         // Gold/Precious Metals
         { name: 'Kitco Gold', url: 'https://www.kitco.com/rss/KitcoNews.xml', category: 'gold', type: 'gold' },
@@ -17,19 +17,21 @@ const CONFIG = {
         
         // Central Bank Feeds
         { name: 'Federal Reserve', url: 'https://www.federalreserve.gov/feeds/press_all.xml', category: 'USD', type: 'centralbank', bank: 'FED' },
-        { name: 'Bank of England', url: 'https://www.bankofengland.co.uk/rss/news', category: 'GBP', type: 'centralbank', bank: 'BoE' },
+        { name: 'Bank of England', url: 'https://www.bankofengland.co.uk/news.rss', category: 'GBP', type: 'centralbank', bank: 'BoE' },
         { name: 'European Central Bank', url: 'https://www.ecb.europa.eu/rss/press.xml', category: 'EUR', type: 'centralbank', bank: 'ECB' },
         { name: 'Bank of Japan', url: 'https://www.boj.or.jp/en/rss/pressrelease.xml', category: 'JPY', type: 'centralbank', bank: 'BoJ' },
-        { name: 'Bank of Canada', url: 'https://www.bankofcanada.ca/feeds/press_releases.xml', category: 'CAD', type: 'centralbank', bank: 'BoC' },
-        { name: 'Swiss National Bank', url: 'https://www.snb.ch/en/mmr/rss/rss_feed', category: 'CHF', type: 'centralbank', bank: 'SNB' },
-        { name: 'Reserve Bank of Australia', url: 'https://www.rba.gov.au/rss/rss.xml', category: 'AUD', type: 'centralbank', bank: 'RBA' },
         
         // Trump News Feeds
-        { name: 'Reuters Trump', url: 'https://www.reuters.com/rss/donald-trump', category: 'trump', type: 'trump' },
-        { name: 'AP News Politics', url: 'https://feeds.apnews.com/rss/apf-politics', category: 'trump', type: 'trump' },
-        { name: 'BBC News US Politics', url: 'http://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml', category: 'trump', type: 'trump' }
+        { name: 'Reuters Trump', url: 'https://www.reuters.com/rssfeed/politicsNews', category: 'trump', type: 'trump' },
+        { name: 'AP Politics', url: 'https://feeds.apnews.com/rss/apf-politics', category: 'trump', type: 'trump' },
+        { name: 'CNN Politics', url: 'http://rss.cnn.com/rss/cnn_allpolitics.rss', category: 'trump', type: 'trump' }
     ],
     PROXY_URL: 'https://api.rss2json.com/v1/api.json?rss_url=',
+    BACKUP_PROXIES: [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
+        'https://api.codetabs.com/v1/proxy?quest='
+    ],
     AUTO_REFRESH_INTERVAL: 30000, // 30 seconds for real-time updates
     NOTIFICATION_CHECK_INTERVAL: 15000, // Check for new articles every 15 seconds
     CURRENCIES: ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'MXN'],
@@ -1132,39 +1134,121 @@ class TradingViewManager {
 
 // ===== API Functions =====
 async function fetchRSSFeed(feed) {
+    console.log(`📡 Fetching ${feed.name}...`);
+    
+    // Try RSS2JSON first (best for parsing)
     try {
-        const response = await fetch(CONFIG.PROXY_URL + encodeURIComponent(feed.url));
-        const data = await response.json();
+        const response = await fetch(CONFIG.PROXY_URL + encodeURIComponent(feed.url), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
         
-        if (data.status === 'ok' && data.items && data.items.length > 0) {
-            return data.items.map(item => {
-                const article = {
-                    title: item.title,
-                    description: ArticleProcessor.cleanDescription(item.description || item.content || ''),
-                    url: item.link,
-                    publishedAt: item.pubDate,
-                    source: feed.name
-                };
-                return ArticleProcessor.analyzeArticle(article, feed);
-            });
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (data.status === 'ok' && data.items && data.items.length > 0) {
+                console.log(`✅ ${feed.name}: Loaded ${data.items.length} articles`);
+                return data.items.map(item => {
+                    const article = {
+                        title: item.title,
+                        description: ArticleProcessor.cleanDescription(item.description || item.content || ''),
+                        url: item.link,
+                        publishedAt: item.pubDate,
+                        source: feed.name
+                    };
+                    return ArticleProcessor.analyzeArticle(article, feed);
+                });
+            }
         }
-        return [];
     } catch (error) {
-        console.error(`Error fetching ${feed.name}:`, error);
+        console.warn(`⚠️ ${feed.name} failed with RSS2JSON, trying backup...`, error.message);
+    }
+    
+    // Try direct fetch with CORS proxy
+    for (const proxy of CONFIG.BACKUP_PROXIES) {
+        try {
+            console.log(`🔄 Trying backup proxy for ${feed.name}...`);
+            const response = await fetch(proxy + encodeURIComponent(feed.url));
+            
+            if (response.ok) {
+                const xmlText = await response.text();
+                const articles = parseRSSXML(xmlText, feed);
+                if (articles.length > 0) {
+                    console.log(`✅ ${feed.name}: Loaded ${articles.length} articles via backup`);
+                    return articles;
+                }
+            }
+        } catch (error) {
+            console.warn(`⚠️ Backup proxy failed for ${feed.name}:`, error.message);
+            continue;
+        }
+    }
+    
+    console.error(`❌ All methods failed for ${feed.name}`);
+    return [];
+}
+
+// Parse RSS XML manually
+function parseRSSXML(xmlText, feed) {
+    try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        
+        const items = xmlDoc.querySelectorAll('item');
+        const articles = [];
+        
+        items.forEach((item, index) => {
+            if (index < 20) { // Limit to 20 articles per feed
+                const title = item.querySelector('title')?.textContent || '';
+                const description = item.querySelector('description')?.textContent || '';
+                const link = item.querySelector('link')?.textContent || '';
+                const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
+                
+                if (title && link) {
+                    const article = {
+                        title: title,
+                        description: ArticleProcessor.cleanDescription(description),
+                        url: link,
+                        publishedAt: pubDate,
+                        source: feed.name
+                    };
+                    articles.push(ArticleProcessor.analyzeArticle(article, feed));
+                }
+            }
+        });
+        
+        return articles;
+    } catch (error) {
+        console.error('XML parsing error:', error);
         return [];
     }
 }
 
 async function fetchAllNews() {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📡 Fetching REAL-TIME news from', CONFIG.RSS_FEEDS.length, 'sources...');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     const allArticles = [];
     const promises = CONFIG.RSS_FEEDS.map(feed => fetchRSSFeed(feed));
-    const results = await Promise.all(promises);
+    const results = await Promise.allSettled(promises);
     
-    results.forEach(articles => {
-        allArticles.push(...articles);
+    let successCount = 0;
+    results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.length > 0) {
+            allArticles.push(...result.value);
+            successCount++;
+        } else {
+            console.warn(`❌ ${CONFIG.RSS_FEEDS[index].name} returned no articles`);
+        }
     });
     
     allArticles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`✅ Successfully loaded ${successCount}/${CONFIG.RSS_FEEDS.length} feeds`);
+    console.log(`📊 Total LIVE articles: ${allArticles.length}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     return allArticles;
 }
