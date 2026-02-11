@@ -32,8 +32,8 @@ const CONFIG = {
         'https://corsproxy.io/?',
         'https://api.codetabs.com/v1/proxy?quest='
     ],
-    AUTO_REFRESH_INTERVAL: 30000, // 30 seconds for real-time updates
-    NOTIFICATION_CHECK_INTERVAL: 15000, // Check for new articles every 15 seconds
+    AUTO_REFRESH_INTERVAL: 5000, // 5 seconds for real-time updates
+    NOTIFICATION_CHECK_INTERVAL: 5000, // Check every 5 seconds
     CURRENCIES: ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'MXN'],
     CURRENCY_FLAGS: {
         'EUR': '🇪🇺',
@@ -129,19 +129,52 @@ class SentimentAnalyzer {
         const fullText = (title + ' ' + description).toLowerCase();
         const sentiment = {};
         
-        detectedCurrencies.forEach(currency => {
+        // Auto-detect ALL currencies in the text, not just pre-detected ones
+        const allMentionedCurrencies = new Set(detectedCurrencies);
+        
+        // Check for all possible currencies
+        CONFIG.CURRENCIES.forEach(curr => {
+            const currLower = curr.toLowerCase();
+            const currName = CONFIG.CURRENCY_NAMES[curr]?.toLowerCase();
+            
+            if (fullText.includes(currLower) || 
+                fullText.includes(`${currLower}/`) ||
+                fullText.includes(`/${currLower}`) ||
+                (currName && fullText.includes(currName))) {
+                allMentionedCurrencies.add(curr);
+            }
+        });
+        
+        // Check for MXN/peso
+        if (fullText.includes('peso') || fullText.includes('mexico') || fullText.includes('mxn')) {
+            allMentionedCurrencies.add('MXN');
+        }
+        
+        // Check for NZD/kiwi
+        if (fullText.includes('kiwi') || fullText.includes('new zealand') || fullText.includes('nzd')) {
+            allMentionedCurrencies.add('NZD');
+        }
+        
+        // Initialize sentiment for all detected currencies
+        Array.from(allMentionedCurrencies).forEach(currency => {
             sentiment[currency] = null;
         });
         
-        detectedCurrencies.forEach(currency => {
+        // Analyze each currency
+        Array.from(allMentionedCurrencies).forEach(currency => {
             const analysis = this.analyzeSingleCurrency(fullText, title, currency, centralBanks);
             if (analysis) {
                 sentiment[currency] = analysis;
             }
         });
         
-        this.applyPairCorrelations(fullText, sentiment, detectedCurrencies);
+        // Apply pair correlations
+        this.applyPairCorrelations(fullText, sentiment, Array.from(allMentionedCurrencies));
         
+        // Apply central bank impact
+        this.applyCentralBankImpact(fullText, sentiment, centralBanks);
+        
+        // Remove null sentiments
         Object.keys(sentiment).forEach(key => {
             if (sentiment[key] === null) {
                 delete sentiment[key];
@@ -149,6 +182,34 @@ class SentimentAnalyzer {
         });
         
         return sentiment;
+    }
+    
+    // NEW: Apply central bank impact to currencies
+    static applyCentralBankImpact(fullText, sentiment, centralBanks) {
+        centralBanks.forEach(bank => {
+            const currency = this.CENTRAL_BANKS[bank];
+            if (!currency) return;
+            
+            // If central bank is mentioned and currency sentiment is null, determine it
+            if (sentiment.hasOwnProperty(currency) && !sentiment[currency]) {
+                let score = 0;
+                
+                // Hawkish patterns = bullish for currency
+                const hawkish = ['hawkish', 'rate hike', 'tightening', 'raising rates', 'inflation fight'];
+                hawkish.forEach(pattern => {
+                    if (fullText.includes(pattern)) score += 2;
+                });
+                
+                // Dovish patterns = bearish for currency
+                const dovish = ['dovish', 'rate cut', 'easing', 'lowering rates', 'stimulus'];
+                dovish.forEach(pattern => {
+                    if (fullText.includes(pattern)) score -= 2;
+                });
+                
+                if (score > 1) sentiment[currency] = 'Bullish';
+                if (score < -1) sentiment[currency] = 'Bearish';
+            }
+        });
     }
     
     static analyzeSingleCurrency(fullText, title, currency, centralBanks) {
@@ -356,15 +417,17 @@ class SentimentAnalyzer {
         
         // High impact keywords related to Trump
         const highImpactKeywords = [
-            'tariff', 'trade war', 'china deal', 'mexico wall', 'fed chair',
-            'interest rate', 'tax', 'economic policy', 'trade agreement',
-            'sanctions', 'immigration policy', 'executive order', 'military',
-            'stock market', 'economy', 'unemployment', 'gdp'
+            'tariff', 'trade war', 'china', 'mexico', 'canada', 'fed chair',
+            'interest rate', 'tax cut', 'economic policy', 'trade agreement', 'trade deal',
+            'sanctions', 'immigration', 'executive order', 'military action',
+            'stock market crash', 'economy', 'unemployment', 'gdp', 'nafta', 'usmca',
+            'wall', 'border', 'deportation', 'european union'
         ];
         
         const mediumImpactKeywords = [
             'tweet', 'statement', 'press conference', 'rally', 'speech',
-            'white house', 'policy', 'announcement', 'meeting'
+            'white house', 'policy', 'announcement', 'meeting', 'republicans',
+            'democrats', 'congress', 'senate'
         ];
         
         const hasHighImpact = highImpactKeywords.some(keyword => fullText.includes(keyword));
@@ -374,6 +437,57 @@ class SentimentAnalyzer {
         else if (hasMediumImpact) marketImpact = 'medium';
         
         return marketImpact;
+    }
+    
+    // NEW: Analyze Trump news for currency impact
+    static analyzeTrumpCurrencyImpact(title, description) {
+        const fullText = (title + ' ' + description).toLowerCase();
+        const currencyImpact = {};
+        
+        // Tariff impact
+        if (fullText.includes('tariff') || fullText.includes('trade war')) {
+            currencyImpact.USD = 'Neutral'; // USD mixed on trade wars
+            
+            if (fullText.includes('china')) {
+                currencyImpact.CNY = 'Bearish';
+                currencyImpact.AUD = 'Bearish'; // Australia exports to China
+            }
+            if (fullText.includes('mexico')) {
+                currencyImpact.MXN = 'Bearish';
+            }
+            if (fullText.includes('canada')) {
+                currencyImpact.CAD = 'Bearish';
+            }
+            if (fullText.includes('europe') || fullText.includes('eu')) {
+                currencyImpact.EUR = 'Bearish';
+            }
+        }
+        
+        // Fed/interest rate mentions
+        if (fullText.includes('fed') || fullText.includes('federal reserve') || fullText.includes('interest rate')) {
+            if (fullText.includes('dovish') || fullText.includes('lower') || fullText.includes('cut')) {
+                currencyImpact.USD = 'Bearish';
+            } else if (fullText.includes('hawkish') || fullText.includes('raise') || fullText.includes('hike')) {
+                currencyImpact.USD = 'Bullish';
+            }
+        }
+        
+        // Tax policy
+        if (fullText.includes('tax cut') || fullText.includes('tax reform')) {
+            currencyImpact.USD = 'Bullish'; // Tax cuts typically support USD
+        }
+        
+        // Government shutdown/crisis
+        if (fullText.includes('shutdown') || fullText.includes('crisis') || fullText.includes('impeachment')) {
+            currencyImpact.USD = 'Bearish';
+        }
+        
+        // Immigration/border
+        if (fullText.includes('border') || fullText.includes('immigration') || fullText.includes('wall')) {
+            currencyImpact.MXN = 'Bearish';
+        }
+        
+        return currencyImpact;
     }
 }
 
@@ -984,6 +1098,19 @@ class ArticleProcessor {
                 article.title,
                 article.description
             );
+            
+            // Add Trump currency impacts to existing sentiment
+            const trumpCurrencyImpact = SentimentAnalyzer.analyzeTrumpCurrencyImpact(
+                article.title,
+                article.description
+            );
+            
+            // Merge Trump impacts with existing currency sentiment
+            Object.entries(trumpCurrencyImpact).forEach(([curr, impact]) => {
+                if (!enhancedArticle.currencySentiment[curr]) {
+                    enhancedArticle.currencySentiment[curr] = impact;
+                }
+            });
         }
         
         return enhancedArticle;
@@ -1351,15 +1478,7 @@ function renderNewsCard(article) {
         ${sentimentHTML}
         <div class="news-tags">${tagsHTML}</div>
         <div class="news-card-actions">
-            <button class="btn-ai-analysis" onclick="showAIAnalysis(${state.newsCache.indexOf(article)})">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                </svg>
-                AI Analysis
-            </button>
-            <a href="${article.url}" target="_blank" class="read-more">Read Full Article</a>
+            <a href="${article.url}" target="_blank" class="read-more-primary">📰 Read Full Article</a>
         </div>
     `;
     
@@ -2070,13 +2189,153 @@ function startRealTimeUpdates() {
     }, CONFIG.NOTIFICATION_CHECK_INTERVAL);
 }
 
+// ===== Market Hours Functions =====
+function showMarketHours() {
+    renderMarketHours();
+    document.getElementById('marketHoursModal').classList.add('active');
+}
+
+function closeMarketHours() {
+    document.getElementById('marketHoursModal').classList.remove('active');
+}
+
+function renderMarketHours() {
+    const container = document.getElementById('marketHoursContainer');
+    if (!container) return;
+    
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const utcMinute = now.getUTCMinutes();
+    
+    // Define trading sessions (UTC times)
+    const sessions = {
+        sydney: {
+            name: 'Sydney',
+            flag: '🇦🇺',
+            open: 22,
+            close: 7,
+            timezone: 'AEDT (UTC+11)',
+            color: '#10b981'
+        },
+        tokyo: {
+            name: 'Tokyo',
+            flag: '🇯🇵',
+            open: 0,
+            close: 9,
+            timezone: 'JST (UTC+9)',
+            color: '#ec4899'
+        },
+        london: {
+            name: 'London',
+            flag: '🇬🇧',
+            open: 8,
+            close: 17,
+            timezone: 'GMT (UTC+0)',
+            color: '#3b82f6'
+        },
+        newyork: {
+            name: 'New York',
+            flag: '🇺🇸',
+            open: 13,
+            close: 22,
+            timezone: 'EST (UTC-5)',
+            color: '#10b981'
+        }
+    };
+    
+    // Determine which sessions are open
+    Object.values(sessions).forEach(session => {
+        if (session.open > session.close) {
+            // Session crosses midnight
+            session.isOpen = utcHour >= session.open || utcHour < session.close;
+        } else {
+            session.isOpen = utcHour >= session.open && utcHour < session.close;
+        }
+    });
+    
+    const openCount = Object.values(sessions).filter(s => s.isOpen).length;
+    
+    let html = `
+        <div class="market-hours-live">
+            <div class="current-time-display">
+                <h3>🌍 Current UTC Time: ${now.toUTCString()}</h3>
+                <p class="sessions-open-count">${openCount} Session${openCount !== 1 ? 's' : ''} Currently OPEN</p>
+            </div>
+            
+            <div class="sessions-grid">
+    `;
+    
+    Object.values(sessions).forEach(session => {
+        const statusClass = session.isOpen ? 'open' : 'closed';
+        const statusText = session.isOpen ? '🟢 OPEN' : '🔴 CLOSED';
+        
+        html += `
+            <div class="session-card ${statusClass}">
+                <div class="session-header">
+                    <span class="session-flag">${session.flag}</span>
+                    <h4 class="session-name">${session.name}</h4>
+                </div>
+                <div class="session-status-badge ${statusClass}">${statusText}</div>
+                <div class="session-info">
+                    <p class="session-timezone">${session.timezone}</p>
+                    <p class="session-hours">${session.open}:00 - ${session.close}:00 UTC</p>
+                </div>
+                <div class="session-indicator" style="background: ${session.isOpen ? session.color : '#374151'}"></div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+            
+            <div class="best-times-section">
+                <h3>⭐ Best Trading Times</h3>
+                <div class="best-times-grid">
+                    <div class="time-slot high-volume">
+                        <strong>London Open (08:00-12:00 UTC)</strong>
+                        <p>Highest volume and volatility. Best for EUR/USD, GBP/USD</p>
+                    </div>
+                    <div class="time-slot medium-volume">
+                        <strong>New York Open (13:00-17:00 UTC)</strong>
+                        <p>Overlap with London. Great for USD pairs</p>
+                    </div>
+                    <div class="time-slot low-volume">
+                        <strong>Tokyo Session (00:00-09:00 UTC)</strong>
+                        <p>Good for JPY, AUD, NZD pairs</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="market-hours-note">
+                <p>💡 <strong>Tip:</strong> Trading volume peaks during London and New York overlap (13:00-17:00 UTC). Spreads are tightest and liquidity is highest during these hours.</p>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 ForexLive Intelligence initializing...');
-    console.log('🤖 AI Engine: Puter.ai (FREE Claude 3.5 Sonnet - No API key needed!)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🚀 ForexLive Intelligence STARTING...');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🤖 AI: Puter.ai (FREE - No API key)');
+    console.log('⚡ Auto-refresh: Every 5 seconds');
+    console.log('💱 Currency Sentiment: AUTO-DETECT');
+    console.log('🕐 Market Hours: LIVE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     loadAllNews();
     startRealTimeUpdates();
+    
+    // Update market hours every minute
+    setInterval(() => {
+        const modal = document.getElementById('marketHoursModal');
+        if (modal && modal.classList.contains('active')) {
+            renderMarketHours();
+        }
+    }, 60000);
     
     // Close modals on backdrop click
     window.addEventListener('click', (e) => {
@@ -2086,16 +2345,14 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAIAnalysis();
             closeCharts();
             closeTrumpTracker();
+            closeMarketHours();
         }
     });
     
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ ForexLive Intelligence READY');
-    console.log('🤖 AI: Puter.ai with Claude 3.5');
     console.log('🦅 Trump Tracker: Enabled');
     console.log('📊 TradingView Charts: Enabled');
     console.log('📈 Currency Strength: Enabled');  
     console.log('🔔 Push Notifications: Ready');
-    console.log('💱 Currencies: USD, EUR, GBP, JPY, AUD, CAD, CHF, NZD, MXN + GOLD');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });

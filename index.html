@@ -62,6 +62,14 @@
                         <span>Trump Tracker</span>
                         <span class="notification-badge live-badge">LIVE</span>
                     </button>
+                    <button class="control-btn" onclick="showMarketHours()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>Market Hours</span>
+                        <span class="notification-badge live-badge">LIVE</span>
+                    </button>
                     <button class="control-btn calendar-btn" onclick="showCalendar()">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -305,6 +313,28 @@
                         <button class="chart-tab" data-symbol="TVC:DXY" onclick="switchChart('DXY', this)">DXY</button>
                     </div>
                     <div id="tradingview_chart" style="height: 600px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Market Hours Modal -->
+        <div id="marketHoursModal" class="modal">
+            <div class="modal-backdrop" onclick="closeMarketHours()"></div>
+            <div class="modal-container large">
+                <div class="modal-header">
+                    <div class="modal-title-section">
+                        <h2 class="modal-title">🕐 Live Forex Market Hours</h2>
+                        <p class="modal-subtitle">Real-time trading session status</p>
+                    </div>
+                    <button class="modal-close-btn" onclick="closeMarketHours()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="marketHoursContainer"></div>
                 </div>
             </div>
         </div>

@@ -2019,3 +2019,192 @@ body {
         max-width: none;
     }
 }
+
+/* Market Hours Styles */
+.market-hours-live {
+    padding: 1rem;
+}
+
+.current-time-display {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1));
+    border-radius: 12px;
+}
+
+.current-time-display h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--accent-primary);
+}
+
+.sessions-open-count {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.sessions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.session-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 2px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.session-card.open {
+    border-color: var(--accent-success);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+.session-card.closed {
+    opacity: 0.6;
+}
+
+.session-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.session-flag {
+    font-size: 2rem;
+}
+
+.session-name {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+}
+
+.session-status-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.session-status-badge.open {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--accent-success);
+}
+
+.session-status-badge.closed {
+    background: rgba(107, 114, 128, 0.2);
+    color: var(--text-tertiary);
+}
+
+.session-info p {
+    margin: 0.5rem 0;
+    color: var(--text-secondary);
+}
+
+.session-timezone {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.session-hours {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.session-indicator {
+    height: 4px;
+    border-radius: 2px;
+    margin-top: 1rem;
+}
+
+.best-times-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 12px;
+}
+
+.best-times-section h3 {
+    margin: 0 0 1rem 0;
+    color: var(--accent-primary);
+}
+
+.best-times-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.time-slot {
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+
+.time-slot.high-volume {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: var(--accent-success);
+}
+
+.time-slot.medium-volume {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--accent-primary);
+}
+
+.time-slot.low-volume {
+    background: rgba(156, 163, 175, 0.1);
+    border-color: var(--text-tertiary);
+}
+
+.time-slot strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.time-slot p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.market-hours-note {
+    padding: 1rem;
+    background: rgba(251, 191, 36, 0.1);
+    border-left: 4px solid #fbbf24;
+    border-radius: 8px;
+    margin-top: 1.5rem;
+}
+
+.market-hours-note p {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.read-more-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--accent-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.read-more-primary:hover {
+    background: #2563eb;
+    transform: translateY(-2px);
+}
