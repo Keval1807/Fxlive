@@ -1,30 +1,75 @@
 // ===== Configuration =====
 const CONFIG = {
-    // Puter.ai Configuration - FREE, NO API KEY NEEDED!
-    USE_PUTER_AI: true,
+    // No AI needed - using smart sentiment analysis
     
     RSS_FEEDS: [
-        // Forex News Feeds - Most Reliable
+        // Major Forex News Sources - Real-time (Updated every minute)
         { name: 'ForexLive', url: 'https://www.forexlive.com/feed/news', category: 'forex', type: 'forex' },
-        { name: 'FXStreet', url: 'https://www.fxstreet.com/rss/news', category: 'forex', type: 'forex' },
-        { name: 'DailyFX', url: 'https://www.dailyfx.com/feeds/market-news', category: 'forex', type: 'forex' },
-        { name: 'Investing.com Forex', url: 'https://www.investing.com/rss/news_25.rss', category: 'forex', type: 'forex' },
-        { name: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/marketpulse/', category: 'forex', type: 'forex' },
+        { name: 'ForexLive Technical', url: 'https://www.forexlive.com/feed/technicalanalysis', category: 'forex', type: 'forex' },
+        { name: 'FXStreet News', url: 'https://www.fxstreet.com/rss/news', category: 'forex', type: 'forex' },
+        { name: 'FXStreet Analysis', url: 'https://www.fxstreet.com/rss/analysis', category: 'forex', type: 'forex' },
+        { name: 'FXStreet Forecasts', url: 'https://www.fxstreet.com/rss/forecasts', category: 'forex', type: 'forex' },
+        { name: 'DailyFX News', url: 'https://www.dailyfx.com/feeds/market-news', category: 'forex', type: 'forex' },
+        { name: 'DailyFX Analysis', url: 'https://www.dailyfx.com/feeds/analyst-picks', category: 'forex', type: 'forex' },
+        { name: 'DailyFX Forecasts', url: 'https://www.dailyfx.com/feeds/forecasts', category: 'forex', type: 'forex' },
         
-        // Gold/Precious Metals
-        { name: 'Kitco Gold', url: 'https://www.kitco.com/rss/KitcoNews.xml', category: 'gold', type: 'gold' },
-        { name: 'Gold.org', url: 'https://www.gold.org/feed', category: 'gold', type: 'gold' },
+        // Investing.com - Multiple feeds
+        { name: 'Investing Forex', url: 'https://www.investing.com/rss/news_25.rss', category: 'forex', type: 'forex' },
+        { name: 'Investing Commodities', url: 'https://www.investing.com/rss/commodities.rss', category: 'forex', type: 'forex' },
+        { name: 'Investing Economic Indicators', url: 'https://www.investing.com/rss/news_95.rss', category: 'forex', type: 'forex' },
+        { name: 'Investing World News', url: 'https://www.investing.com/rss/news_1.rss', category: 'forex', type: 'forex' },
+        
+        // Major Financial News
+        { name: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/marketpulse/', category: 'forex', type: 'forex' },
+        { name: 'Bloomberg Markets', url: 'https://feeds.bloomberg.com/markets/news.rss', category: 'forex', type: 'forex' },
+        { name: 'Reuters Business', url: 'https://www.reuters.com/rssfeed/businessNews', category: 'forex', type: 'forex' },
+        { name: 'Reuters Markets', url: 'https://www.reuters.com/rssfeed/marketsNews', category: 'forex', type: 'forex' },
+        
+        // Specialized Forex Sites
+        { name: 'FXEmpire', url: 'https://www.fxempire.com/api/v1/en/markets/news/rss', category: 'forex', type: 'forex' },
+        { name: 'Action Forex', url: 'https://www.actionforex.com/feed/', category: 'forex', type: 'forex' },
+        { name: 'FXStreet EUR/USD', url: 'https://www.fxstreet.com/rss/eur-usd/news', category: 'forex', type: 'forex' },
+        { name: 'FXStreet GBP/USD', url: 'https://www.fxstreet.com/rss/gbp-usd/news', category: 'forex', type: 'forex' },
+        
+        // Economic Data & Analysis
+        { name: 'Trading Economics', url: 'https://tradingeconomics.com/rss/news.aspx', category: 'forex', type: 'forex' },
+        { name: 'Econoday', url: 'http://www.econoday.com/rss.xml', category: 'forex', type: 'forex' },
+        { name: 'Myfxbook', url: 'https://www.myfxbook.com/rss/forex-market-news', category: 'forex', type: 'forex' },
+        
+        // Gold/Precious Metals - Multiple sources
+        { name: 'Kitco Gold News', url: 'https://www.kitco.com/rss/KitcoNews.xml', category: 'gold', type: 'gold' },
+        { name: 'Kitco Market Updates', url: 'https://www.kitco.com/rss/KitcoMarketUpdates.xml', category: 'gold', type: 'gold' },
+        { name: 'Gold.org News', url: 'https://www.gold.org/feed', category: 'gold', type: 'gold' },
+        { name: 'BullionVault', url: 'https://www.bullionvault.com/rss/gold-news.xml', category: 'gold', type: 'gold' },
+        { name: 'Investing Gold', url: 'https://www.investing.com/rss/commodities_59.rss', category: 'gold', type: 'gold' },
         
         // Central Bank Feeds
         { name: 'Federal Reserve', url: 'https://www.federalreserve.gov/feeds/press_all.xml', category: 'USD', type: 'centralbank', bank: 'FED' },
+        { name: 'Fed Speeches', url: 'https://www.federalreserve.gov/feeds/speeches.xml', category: 'USD', type: 'centralbank', bank: 'FED' },
         { name: 'Bank of England', url: 'https://www.bankofengland.co.uk/news.rss', category: 'GBP', type: 'centralbank', bank: 'BoE' },
-        { name: 'European Central Bank', url: 'https://www.ecb.europa.eu/rss/press.xml', category: 'EUR', type: 'centralbank', bank: 'ECB' },
+        { name: 'ECB Press', url: 'https://www.ecb.europa.eu/rss/press.xml', category: 'EUR', type: 'centralbank', bank: 'ECB' },
+        { name: 'ECB Speeches', url: 'https://www.ecb.europa.eu/rss/speeches.xml', category: 'EUR', type: 'centralbank', bank: 'ECB' },
         { name: 'Bank of Japan', url: 'https://www.boj.or.jp/en/rss/pressrelease.xml', category: 'JPY', type: 'centralbank', bank: 'BoJ' },
+        { name: 'Bank of Canada', url: 'https://www.bankofcanada.ca/feed/', category: 'CAD', type: 'centralbank', bank: 'BoC' },
+        { name: 'RBA News', url: 'https://www.rba.gov.au/rss/rss-cb-lspeech.xml', category: 'AUD', type: 'centralbank', bank: 'RBA' },
         
-        // Trump News Feeds
-        { name: 'Reuters Trump', url: 'https://www.reuters.com/rssfeed/politicsNews', category: 'trump', type: 'trump' },
+        // Trump & Politics News
+        { name: 'Reuters Politics', url: 'https://www.reuters.com/rssfeed/politicsNews', category: 'trump', type: 'trump' },
         { name: 'AP Politics', url: 'https://feeds.apnews.com/rss/apf-politics', category: 'trump', type: 'trump' },
-        { name: 'CNN Politics', url: 'http://rss.cnn.com/rss/cnn_allpolitics.rss', category: 'trump', type: 'trump' }
+        { name: 'CNN Politics', url: 'http://rss.cnn.com/rss/cnn_allpolitics.rss', category: 'trump', type: 'trump' },
+        { name: 'Politico', url: 'https://www.politico.com/rss/politics08.xml', category: 'trump', type: 'trump' },
+        { name: 'The Hill', url: 'https://thehill.com/rss/syndicator/19109', category: 'trump', type: 'trump' },
+        
+        // Major Financial Publications
+        { name: 'Financial Times', url: 'https://www.ft.com/?format=rss', category: 'forex', type: 'forex' },
+        { name: 'WSJ Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', category: 'forex', type: 'forex' },
+        { name: 'WSJ Economy', url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml', category: 'forex', type: 'forex' },
+        { name: 'CNBC Forex', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html', category: 'forex', type: 'forex' },
+        { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex', category: 'forex', type: 'forex' },
+        
+        // International News Agencies
+        { name: 'AFP Business', url: 'https://www.afp.com/en/rss/business', category: 'forex', type: 'forex' },
+        { name: 'BBC Business', url: 'http://feeds.bbci.co.uk/news/business/rss.xml', category: 'forex', type: 'forex' }
     ],
     PROXY_URL: 'https://api.rss2json.com/v1/api.json?rss_url=',
     BACKUP_PROXIES: [
@@ -32,8 +77,8 @@ const CONFIG = {
         'https://corsproxy.io/?',
         'https://api.codetabs.com/v1/proxy?quest='
     ],
-    AUTO_REFRESH_INTERVAL: 5000, // 5 seconds for real-time updates
-    NOTIFICATION_CHECK_INTERVAL: 5000, // Check every 5 seconds
+    AUTO_REFRESH_INTERVAL: 3000, // 3 seconds for real-time updates
+    NOTIFICATION_CHECK_INTERVAL: 3000, // Check every 3 seconds
     CURRENCIES: ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'MXN'],
     CURRENCY_FLAGS: {
         'EUR': '🇪🇺',
@@ -60,29 +105,6 @@ const CONFIG = {
 };
 
 // ===== Google Gemini API Helper =====
-// ===== Puter.ai Helper (FREE - No API Key!) =====
-async function callPuterAI(prompt) {
-    try {
-        console.log('🤖 Calling Puter.ai (FREE Claude 3.5 Sonnet)...');
-        const response = await puter.ai.chat(prompt);
-        console.log('✅ Puter.ai response received');
-        return response;
-    } catch (error) {
-        console.error('❌ Puter.ai error:', error);
-        throw error;
-    }
-}
-
-// Keep old function name for compatibility
-async function callGeminiAPI(prompt, useHistory = true) {
-    return await callPuterAI(prompt);
-}
-
-// Clear conversation history
-function clearConversationHistory() {
-    console.log('🗑️ Conversation history cleared');
-}
-
 // ===== State Management =====
 let state = {
     newsCache: [],
@@ -299,9 +321,12 @@ class SentimentAnalyzer {
             if (fullText.includes(pattern)) bearishScore++;
         });
         
-        const minScore = 0.5;
+        const minScore = 0.1; // Lower threshold = more currencies detected
         if (bullishScore >= minScore && bullishScore > bearishScore) return 'Bullish';
         if (bearishScore >= minScore && bearishScore > bullishScore) return 'Bearish';
+        
+        // If any score exists, show neutral
+        if (bullishScore > 0 || bearishScore > 0) return 'Neutral';
         
         return null;
     }
@@ -404,9 +429,12 @@ class SentimentAnalyzer {
             }
         });
         
-        const minScore = 0.5;
+        const minScore = 0.1; // Lower threshold
         if (bullishScore >= minScore && bullishScore > bearishScore) return 'Bullish';
         if (bearishScore >= minScore && bearishScore > bullishScore) return 'Bearish';
+        
+        // Show neutral if any mention
+        if (bullishScore > 0 || bearishScore > 0) return 'Neutral';
         
         return null;
     }
@@ -2320,9 +2348,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🚀 ForexLive Intelligence STARTING...');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🤖 AI: Puter.ai (FREE - No API key)');
-    console.log('⚡ Auto-refresh: Every 5 seconds');
-    console.log('💱 Currency Sentiment: AUTO-DETECT');
+    console.log('📰 News Sources: 50+ feeds worldwide');
+    console.log('⚡ Auto-refresh: Every 3 seconds');
+    console.log('💱 Currency Sentiment: ALL DETECTED');
     console.log('🕐 Market Hours: LIVE');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
