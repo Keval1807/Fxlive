@@ -1,6 +1,11 @@
 // ===== Configuration =====
 const CONFIG = {
-    // No AI needed - using smart sentiment analysis
+    // Financial Modeling Prep API Key
+    FMP_API_KEY: 'puaB19VsPlFrReOd97ErUq1e2qhdiW9t',
+    
+    // Backend API endpoints (for production use)
+    BACKEND_URL: 'http://localhost:3000',
+    USE_BACKEND: false, // Set to true when backend is running
     
     RSS_FEEDS: [
         // Major Forex News Sources - Real-time (Updated every minute)
@@ -42,6 +47,12 @@ const CONFIG = {
         { name: 'Gold.org News', url: 'https://www.gold.org/feed', category: 'gold', type: 'gold' },
         { name: 'BullionVault', url: 'https://www.bullionvault.com/rss/gold-news.xml', category: 'gold', type: 'gold' },
         { name: 'Investing Gold', url: 'https://www.investing.com/rss/commodities_59.rss', category: 'gold', type: 'gold' },
+        { name: 'Kitco Analysis', url: 'https://www.kitco.com/rss/analysis.xml', category: 'gold', type: 'gold' },
+        { name: 'Gold Eagle', url: 'https://www.gold-eagle.com/rss.xml', category: 'gold', type: 'gold' },
+        
+        // Dollar Index (DXY) Specific
+        { name: 'Investing Dollar Index', url: 'https://www.investing.com/rss/news_301.rss', category: 'DXY', type: 'dxy' },
+        { name: 'DailyFX Dollar', url: 'https://www.dailyfx.com/feeds/dollar', category: 'DXY', type: 'dxy' },
         
         // Central Bank Feeds
         { name: 'Federal Reserve', url: 'https://www.federalreserve.gov/feeds/press_all.xml', category: 'USD', type: 'centralbank', bank: 'FED' },
@@ -79,6 +90,33 @@ const CONFIG = {
     ],
     AUTO_REFRESH_INTERVAL: 3000, // 3 seconds for real-time updates
     NOTIFICATION_CHECK_INTERVAL: 3000, // Check every 3 seconds
+    
+    // Live Ticker Symbols
+    TICKER_SYMBOLS: [
+        // Major Forex Pairs
+        { symbol: 'EURUSD', name: 'EUR/USD', type: 'forex' },
+        { symbol: 'GBPUSD', name: 'GBP/USD', type: 'forex' },
+        { symbol: 'USDJPY', name: 'USD/JPY', type: 'forex' },
+        { symbol: 'AUDUSD', name: 'AUD/USD', type: 'forex' },
+        { symbol: 'USDCAD', name: 'USD/CAD', type: 'forex' },
+        { symbol: 'USDCHF', name: 'USD/CHF', type: 'forex' },
+        // Commodities
+        { symbol: 'XAUUSD', name: 'Gold', type: 'commodity' },
+        { symbol: 'XAGUSD', name: 'Silver', type: 'commodity' },
+        { symbol: 'USOIL', name: 'Oil', type: 'commodity' },
+        // Crypto
+        { symbol: 'BTCUSD', name: 'Bitcoin', type: 'crypto' },
+        // Index
+        { symbol: 'DXY', name: 'Dollar Index', type: 'index' }
+    ],
+    
+    // US Treasury Yields
+    US_YIELDS: [
+        { symbol: '^TNX', name: '10-Year', period: '10Y' },
+        { symbol: '^FVX', name: '5-Year', period: '5Y' },
+        { symbol: '^IRX', name: '13-Week', period: '3M' }
+    ],
+    
     CURRENCIES: ['EUR', 'USD', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'MXN'],
     CURRENCY_FLAGS: {
         'EUR': '🇪🇺',
@@ -123,8 +161,72 @@ let state = {
     currentChartSymbol: 'EURUSD',
     pushSubscription: null,
     conversationHistory: [], // Store AI conversation context
-    currentArticleAnalysis: null // Store current article being analyzed
+    currentArticleAnalysis: null, // Store current article being analyzed
+    websocket: null, // WebSocket connection
+    wsConnected: false // WebSocket status
 };
+
+// ===== WebSocket Real-Time Updates =====
+function initWebSocket() {
+    if (!CONFIG.USE_BACKEND) {
+        console.log('⚠️ WebSocket disabled (USE_BACKEND is false)');
+        return;
+    }
+
+    const wsUrl = CONFIG.BACKEND_URL.replace('http', 'ws');
+    console.log(`🔌 Connecting WebSocket: ${wsUrl}`);
+
+    try {
+        state.websocket = new WebSocket(wsUrl);
+
+        state.websocket.onopen = () => {
+            console.log('✅ WebSocket CONNECTED!');
+            state.wsConnected = true;
+            showToast('✅ Live Updates', 'Real-time connection established');
+        };
+
+        state.websocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log(`📨 WebSocket: ${data.type}`);
+
+                if (data.type === 'news_update') {
+                    console.log(`📰 ${data.count} new articles available`);
+                    // Auto-reload news
+                    loadAllNews();
+                }
+
+                if (data.type === 'calendar_update') {
+                    // Reload calendar if modal is open
+                    const modal = document.getElementById('calendarModal');
+                    if (modal && modal.classList.contains('active')) {
+                        loadEconomicCalendar();
+                    }
+                }
+            } catch (error) {
+                console.error('WebSocket parse error:', error);
+            }
+        };
+
+        state.websocket.onclose = () => {
+            console.log('❌ WebSocket DISCONNECTED');
+            state.wsConnected = false;
+            
+            // Auto-reconnect after 5 seconds
+            setTimeout(() => {
+                console.log('🔄 Reconnecting WebSocket...');
+                initWebSocket();
+            }, 5000);
+        };
+
+        state.websocket.onerror = (error) => {
+            console.error('❌ WebSocket ERROR:', error);
+        };
+
+    } catch (error) {
+        console.error('WebSocket init failed:', error);
+    }
+}
 
 // ===== Advanced Sentiment Analysis Engine =====
 class SentimentAnalyzer {
@@ -1724,31 +1826,130 @@ function renderMarketSummary() {
 }
 
 // ===== Economic Calendar Widget =====
-function initEconomicCalendar() {
+// ===== REAL Economic Calendar (FMP) =====
+async function loadEconomicCalendar() {
     const container = document.getElementById('calendarContainer');
     
-    // TradingView Economic Calendar Widget
-    container.innerHTML = `
-        <div class="tradingview-widget-container" style="height: 100%; width: 100%;">
-            <div class="tradingview-widget-container__widget" style="height: calc(100% - 32px); width: 100%;"></div>
-        </div>
-    `;
-    
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-        "colorTheme": "dark",
-        "isTransparent": false,
-        "width": "100%",
-        "height": "100%",
-        "locale": "en",
-        "importanceFilter": "0,1"
-    });
-    
-    const widgetContainer = container.querySelector('.tradingview-widget-container__widget');
-    widgetContainer.appendChild(script);
+    try {
+        container.innerHTML = `
+            <div class="loading-container">
+                <div class="loading-spinner-advanced">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                </div>
+                <p class="loading-message">📅 Loading Economic Calendar...</p>
+            </div>
+        `;
+        
+        // Fetch from backend if enabled, otherwise direct from FMP
+        const apiUrl = CONFIG.USE_BACKEND 
+            ? `${CONFIG.BACKEND_URL}/api/calendar`
+            : `https://financialmodelingprep.com/api/v3/economic_calendar?apikey=${CONFIG.FMP_API_KEY}`;
+        
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid calendar response');
+        }
+        
+        console.log(`✅ Loaded ${data.length} economic events`);
+        
+        // Filter and sort by date - next 50 events
+        const now = new Date();
+        const sorted = data
+            .filter(e => e.impact && new Date(e.date) >= now)
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+            .slice(0, 50);
+        
+        if (sorted.length === 0) {
+            container.innerHTML = '<p class="no-events">No upcoming economic events found</p>';
+            return;
+        }
+        
+        // Group by date
+        const grouped = {};
+        sorted.forEach(event => {
+            const dateKey = new Date(event.date).toLocaleDateString();
+            if (!grouped[dateKey]) grouped[dateKey] = [];
+            grouped[dateKey].push(event);
+        });
+        
+        let html = '<div class="calendar-events-container">';
+        
+        Object.entries(grouped).forEach(([date, events]) => {
+            html += `
+                <div class="calendar-date-group">
+                    <h3 class="calendar-date-header">📅 ${date}</h3>
+                    <div class="calendar-events-list">
+            `;
+            
+            events.forEach(e => {
+                const impactClass = 
+                    e.impact === 'High' ? 'impact-high' :
+                    e.impact === 'Medium' ? 'impact-medium' :
+                    'impact-low';
+                
+                const impactIcon = 
+                    e.impact === 'High' ? '🔴' :
+                    e.impact === 'Medium' ? '🟡' :
+                    '🟢';
+                
+                const time = new Date(e.date).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZoneName: 'short'
+                });
+                
+                html += `
+                    <div class="calendar-event ${impactClass}">
+                        <div class="event-left">
+                            <div class="event-header">
+                                <span class="event-flag">${CONFIG.CURRENCY_FLAGS[e.currency] || '🌍'}</span>
+                                <strong class="event-name">${e.event}</strong>
+                            </div>
+                            <div class="event-details">
+                                <span class="event-country">${e.country}</span>
+                                <span class="event-separator">•</span>
+                                <span class="event-currency">${e.currency}</span>
+                            </div>
+                            ${e.actual ? `<div class="event-values">
+                                <span class="value-label">Actual:</span> <span class="value-actual">${e.actual}</span>
+                                ${e.estimate ? `<span class="value-separator">|</span> <span class="value-label">Est:</span> <span class="value-estimate">${e.estimate}</span>` : ''}
+                                ${e.previous ? `<span class="value-separator">|</span> <span class="value-label">Prev:</span> <span class="value-previous">${e.previous}</span>` : ''}
+                            </div>` : ''}
+                        </div>
+                        <div class="event-right">
+                            <span class="event-impact ${impactClass}">${impactIcon} ${e.impact} Impact</span>
+                            <span class="event-time">${time}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('❌ Calendar error:', error);
+        container.innerHTML = `
+            <div class="error-container">
+                <p class="error-message">⚠️ Failed to load economic calendar</p>
+                <p class="error-details">${error.message}</p>
+                <button class="btn-retry" onclick="loadEconomicCalendar()">🔄 Retry</button>
+            </div>
+        `;
+    }
+}
+
+function initEconomicCalendar() {
+    loadEconomicCalendar();
 }
 
 // ===== AI Analysis Modal =====
@@ -2098,46 +2299,10 @@ function applyFilters() {
 }
 
 // ===== Toggle Functions =====
-async function toggleNotifications() {
-    if (!state.notificationsEnabled) {
-        const granted = await NotificationManager.requestPermission();
-        if (granted) {
-            state.notificationsEnabled = true;
-            document.getElementById('notifBadge').textContent = 'ON';
-            document.getElementById('notifBadge').classList.add('active');
-            showToast('Push Notifications Enabled', 'You will receive real-time alerts for market updates');
-        } else {
-            showToast('Permission Denied', 'Please enable notifications in browser settings');
-        }
-    } else {
-        state.notificationsEnabled = false;
-        document.getElementById('notifBadge').textContent = 'OFF';
-        document.getElementById('notifBadge').classList.remove('active');
-        showToast('Push Notifications Disabled', 'Alerts turned off');
-    }
-}
-
-function toggleMRKTAlerts() {
-    state.mrktAlertsEnabled = !state.mrktAlertsEnabled;
-    const badge = document.getElementById('mrktBadge');
-    
-    if (state.mrktAlertsEnabled) {
-        badge.textContent = 'ON';
-        badge.classList.add('active');
-        showToast('MRKT Alerts Enabled', 'Showing only high-impact news');
-    } else {
-        badge.textContent = 'OFF';
-        badge.classList.remove('active');
-        showToast('MRKT Alerts Disabled', 'Showing all news');
-    }
-    
-    renderNews();
-}
-
 // ===== Modal Functions =====
 function showCalendar() {
     document.getElementById('calendarModal').classList.add('active');
-    initEconomicCalendar();
+    loadEconomicCalendar();
 }
 
 function closeCalendar() {
@@ -2352,7 +2517,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('⚡ Auto-refresh: Every 3 seconds');
     console.log('💱 Currency Sentiment: ALL DETECTED');
     console.log('🕐 Market Hours: LIVE');
+    console.log(`🔧 Backend Mode: ${CONFIG.USE_BACKEND ? 'ENABLED' : 'DISABLED'}`);
+    if (CONFIG.USE_BACKEND) {
+        console.log(`📡 Backend URL: ${CONFIG.BACKEND_URL}`);
+    }
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Initialize WebSocket for real-time updates
+    if (CONFIG.USE_BACKEND) {
+        console.log('🔌 Initializing WebSocket...');
+        initWebSocket();
+    }
     
     loadAllNews();
     startRealTimeUpdates();
@@ -2382,5 +2557,410 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('📊 TradingView Charts: Enabled');
     console.log('📈 Currency Strength: Enabled');  
     console.log('🔔 Push Notifications: Ready');
+    console.log('🔌 WebSocket: ' + (CONFIG.USE_BACKEND ? 'Connecting...' : 'Disabled'));
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+});
+// ===== LIVE TICKER & US YIELDS =====
+
+// Fetch live ticker data
+async function updateLiveTicker() {
+    try {
+        const tickerHTML = CONFIG.TICKER_SYMBOLS.map(symbol => {
+            // Simulated live prices - in production, fetch from API
+            const price = Math.random() * 100;
+            const change = (Math.random() - 0.5) * 2;
+            const changePercent = (change / price * 100).toFixed(2);
+            const isPositive = change > 0;
+            
+            return `
+                <div class="ticker-item ${isPositive ? 'positive' : 'negative'}">
+                    <span class="ticker-symbol">${symbol.name}</span>
+                    <span class="ticker-price">${price.toFixed(symbol.type === 'forex' ? 5 : 2)}</span>
+                    <span class="ticker-change">${isPositive ? '+' : ''}${changePercent}%</span>
+                </div>
+            `;
+        }).join('');
+        
+        document.getElementById('liveTicker').innerHTML = tickerHTML + tickerHTML; // Duplicate for smooth scrolling
+    } catch (error) {
+        console.error('Ticker update error:', error);
+    }
+}
+
+// Fetch US Treasury Yields
+async function updateUSYields() {
+    try {
+        const yieldsHTML = CONFIG.US_YIELDS.map(y => {
+            // Simulated yields - in production, fetch from CNBC/Yahoo Finance API
+            const rate = (Math.random() * 2 + 3).toFixed(3);
+            const change = (Math.random() - 0.5) * 0.1;
+            const isUp = change > 0;
+            
+            return `
+                <div class="yield-item ${isUp ? 'yield-up' : 'yield-down'}">
+                    <span class="yield-period">${y.period}</span>
+                    <span class="yield-rate">${rate}%</span>
+                    <span class="yield-change">${isUp ? '▲' : '▼'} ${Math.abs(change).toFixed(3)}</span>
+                </div>
+            `;
+        }).join('');
+        
+        document.getElementById('yieldsData').innerHTML = yieldsHTML;
+    } catch (error) {
+        console.error('Yields update error:', error);
+    }
+}
+
+// ===== TRADING PSYCHOLOGY & RISK MANAGEMENT =====
+
+const TRADING_PSYCHOLOGY = {
+    quotes: [
+        { author: "Jesse Livermore", quote: "The game of speculation is the most uniformly fascinating game in the world. But it is not a game for the stupid, the mentally lazy, the person of inferior emotional balance, or the get-rich-quick adventurer." },
+        { author: "Paul Tudor Jones", quote: "Don't focus on making money; focus on protecting what you have." },
+        { author: "George Soros", quote: "It's not whether you're right or wrong that's important, but how much money you make when you're right and how much you lose when you're wrong." },
+        { author: "Ray Dalio", quote: "He who lives by the crystal ball will eat shattered glass." },
+        { author: "Warren Buffett", quote: "Risk comes from not knowing what you're doing." },
+        { author: "Stanley Druckenmiller", quote: "It's not whether you're right or wrong, it's how much you make when you're right and how much you lose when you're wrong." },
+        { author: "Mark Douglas", quote: "The hard, cold reality of trading is that every trade has an uncertain outcome." },
+        { author: "Ed Seykota", quote: "Win or lose, everybody gets what they want out of the market." },
+        { author: "Bruce Kovner", quote: "Michael Marcus taught me one thing that was incredibly important... He taught me that you could make a million dollars. If you could make a million dollars, you could make $100 million." },
+        { author: "Richard Dennis", quote: "I always say that you could publish trading rules in the newspaper and no one would follow them. The key is consistency and discipline." },
+        { author: "William Eckhardt", quote: "The majority of people trade far too much...The successful trader is one who can take a loss without emotional devastation." },
+        { author: "Linda Raschke", quote: "The best traders have no ego. To be a winner, you need to give up your need to be right." },
+        { author: "Van K. Tharp", quote: "Trading is a game of probabilities. Each trade is simply another execution of your edge." },
+        { author: "Alexander Elder", quote: "The goal of a successful trader is to make the best trades. Money is secondary." },
+        { author: "Nicolas Darvas", quote: "You must have strict money management. Period. Otherwise, you won't survive." }
+    ],
+    
+    principles: {
+        psychology: [
+            { title: "Control Your Emotions", content: "Fear and greed are the trader's worst enemies. Never let emotions drive your decisions." },
+            { title: "Accept Losses", content: "Losses are part of trading. Accept them, learn from them, and move on. Never revenge trade." },
+            { title: "Stay Disciplined", content: "Follow your trading plan religiously. Discipline beats discretion 99% of the time." },
+            { title: "Manage Expectations", content: "Trading is not a get-rich-quick scheme. Consistent small gains beat occasional big wins." },
+            { title: "Detach from Outcomes", content: "Focus on executing your strategy correctly, not on P&L. Good process = good results." },
+            { title: "Trade Your Plan", content: "Plan your trade and trade your plan. No plan = gambling." },
+            { title: "Avoid Overconfidence", content: "One good trade doesn't make you a genius. Stay humble, stay cautious." },
+            { title: "Learn Continuously", content: "Markets evolve. What worked yesterday may not work tomorrow. Keep learning." }
+        ],
+        
+        riskManagement: [
+            { title: "Never Risk More Than 1-2%", content: "Risk only 1-2% of your capital per trade. This is the #1 rule of survival." },
+            { title: "Use Stop Losses ALWAYS", content: "Every trade MUST have a stop loss. No exceptions. Ever." },
+            { title: "Position Sizing Matters", content: "Proper position sizing is more important than entry price." },
+            { title: "Risk:Reward Minimum 1:2", content: "Never take a trade with less than 1:2 risk-reward ratio. Aim for 1:3 or better." },
+            { title: "Diversify Risk", content: "Don't put all eggs in one basket. Spread risk across pairs and strategies." },
+            { title: "Account for Correlation", content: "Trading EURUSD and GBPUSD together = double exposure. Understand correlations." },
+            { title: "Preserve Capital", content: "Your first job is to protect capital. Growth comes second." },
+            { title: "No Martingale Strategies", content: "Doubling down on losses is a guaranteed way to blow your account." },
+            { title: "Take Partial Profits", content: "Lock in profits at key levels. Let runners run, but secure gains." },
+            { title: "Daily/Weekly Loss Limits", content: "Set maximum daily and weekly loss limits. When hit, STOP trading." }
+        ],
+        
+        mindset: [
+            { title: "Think in Probabilities", content: "No setup is 100%. Even a 70% win rate means 3/10 trades will lose." },
+            { title: "Process Over Outcome", content: "Judge yourself on execution quality, not on whether a single trade won or lost." },
+            { title: "Marathon Not Sprint", content: "Trading is a long-term game. Focus on consistency over months and years." },
+            { title: "Journal Everything", content: "Keep a detailed trading journal. Review it weekly. Learn from mistakes." },
+            { title: "Embrace Uncertainty", content: "The market is uncertain. Accept it. Trade probabilities, not certainties." },
+            { title: "Quality Over Quantity", content: "10 high-quality setups beat 100 mediocre ones." },
+            { title: "Be Patient", content: "Wait for your setup. Boredom is not a reason to trade." },
+            { title: "Stay Humble", content: "The market is bigger than you. It doesn't care about your opinion." }
+        ]
+    }
+};
+
+function showPsychology() {
+    const modal = document.getElementById('psychologyModal');
+    modal.classList.add('active');
+    renderPsychology();
+}
+
+function closePsychology() {
+    document.getElementById('psychologyModal').classList.remove('active');
+}
+
+function renderPsychology() {
+    const container = document.getElementById('psychologyContainer');
+    
+    let html = `
+        <div class="psychology-sections">
+            <!-- Famous Quotes Section -->
+            <div class="psych-section">
+                <h3 class="psych-section-title">💭 Wisdom from Legendary Traders</h3>
+                <div class="quotes-grid">
+    `;
+    
+    TRADING_PSYCHOLOGY.quotes.forEach(q => {
+        html += `
+            <div class="quote-card">
+                <div class="quote-text">"${q.quote}"</div>
+                <div class="quote-author">— ${q.author}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+            
+            <!-- Trading Psychology Principles -->
+            <div class="psych-section">
+                <h3 class="psych-section-title">🧠 Trading Psychology Principles</h3>
+                <div class="principles-grid">
+    `;
+    
+    TRADING_PSYCHOLOGY.principles.psychology.forEach(p => {
+        html += `
+            <div class="principle-card">
+                <div class="principle-title">${p.title}</div>
+                <div class="principle-content">${p.content}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+            
+            <!-- Risk Management Rules -->
+            <div class="psych-section">
+                <h3 class="psych-section-title">🛡️ Risk Management Rules</h3>
+                <div class="principles-grid">
+    `;
+    
+    TRADING_PSYCHOLOGY.principles.riskManagement.forEach(p => {
+        html += `
+            <div class="principle-card risk-card">
+                <div class="principle-title">${p.title}</div>
+                <div class="principle-content">${p.content}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+            
+            <!-- Mindset & Approach -->
+            <div class="psych-section">
+                <h3 class="psych-section-title">🎯 Winning Mindset</h3>
+                <div class="principles-grid">
+    `;
+    
+    TRADING_PSYCHOLOGY.principles.mindset.forEach(p => {
+        html += `
+            <div class="principle-card mindset-card">
+                <div class="principle-title">${p.title}</div>
+                <div class="principle-content">${p.content}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// ===== CURRENCY CORRELATIONS =====
+
+const CORRELATIONS_DATA = {
+    pairs: [
+        { 
+            pair: 'EUR/USD',
+            positiveCorr: [
+                { with: 'GBP/USD', strength: 0.89, reason: 'Both against USD, European connection' },
+                { with: 'AUD/USD', strength: 0.78, reason: 'Risk-on currencies, anti-USD' },
+                { with: 'NZD/USD', strength: 0.77, reason: 'Commodity currencies correlation' },
+                { with: 'Gold', strength: 0.72, reason: 'Both anti-dollar assets' }
+            ],
+            negativeCorr: [
+                { with: 'USD/CHF', strength: -0.95, reason: 'Perfect inverse - USD is quote vs base' },
+                { with: 'USD/JPY', strength: -0.68, reason: 'USD strength inverse' },
+                { with: 'USD/CAD', strength: -0.71, reason: 'USD in opposite position' }
+            ]
+        },
+        {
+            pair: 'GBP/USD',
+            positiveCorr: [
+                { with: 'EUR/USD', strength: 0.89, reason: 'European currencies, anti-USD' },
+                { with: 'AUD/USD', strength: 0.74, reason: 'Risk-on correlation' },
+                { with: 'NZD/USD', strength: 0.72, reason: 'Commonwealth connection' }
+            ],
+            negativeCorr: [
+                { with: 'USD/CHF', strength: -0.87, reason: 'USD opposite position' },
+                { with: 'USD/JPY', strength: -0.65, reason: 'USD inverse relationship' }
+            ]
+        },
+        {
+            pair: 'USD/JPY',
+            positiveCorr: [
+                { with: 'USD/CHF', strength: 0.76, reason: 'Both USD base currency' },
+                { with: 'USD/CAD', strength: 0.68, reason: 'USD strength moves together' },
+                { with: 'US Stocks', strength: 0.71, reason: 'Risk-on sentiment correlation' }
+            ],
+            negativeCorr: [
+                { with: 'EUR/USD', strength: -0.68, reason: 'Inverse USD exposure' },
+                { with: 'GBP/USD', strength: -0.65, reason: 'USD opposite sides' },
+                { with: 'Gold', strength: -0.58, reason: 'Safe haven vs risk assets' }
+            ]
+        },
+        {
+            pair: 'AUD/USD',
+            positiveCorr: [
+                { with: 'NZD/USD', strength: 0.94, reason: 'Geographic proximity, commodities' },
+                { with: 'EUR/USD', strength: 0.78, reason: 'Risk-on currencies' },
+                { with: 'Copper', strength: 0.81, reason: 'Australia exports copper' },
+                { with: 'Gold', strength: 0.77, reason: 'Australia exports gold' }
+            ],
+            negativeCorr: [
+                { with: 'USD/JPY', strength: -0.59, reason: 'Risk-on vs risk-off' },
+                { with: 'USD/CHF', strength: -0.74, reason: 'Opposite USD exposure' }
+            ]
+        },
+        {
+            pair: 'USD/CAD',
+            positiveCorr: [
+                { with: 'USD/JPY', strength: 0.68, reason: 'USD strength correlation' },
+                { with: 'Oil', strength: -0.82, reason: 'Inverse - CAD is oil currency' }
+            ],
+            negativeCorr: [
+                { with: 'EUR/USD', strength: -0.71, reason: 'USD opposite position' },
+                { with: 'Oil Prices', strength: -0.82, reason: 'CAD strengthens with oil' }
+            ]
+        },
+        {
+            pair: 'USD/CHF',
+            positiveCorr: [
+                { with: 'USD/JPY', strength: 0.76, reason: 'USD strength moves together' }
+            ],
+            negativeCorr: [
+                { with: 'EUR/USD', strength: -0.95, reason: 'Near perfect inverse' },
+                { with: 'GBP/USD', strength: -0.87, reason: 'USD opposite sides' },
+                { with: 'Gold', strength: -0.71, reason: 'Safe haven vs USD' }
+            ]
+        },
+        {
+            pair: 'NZD/USD',
+            positiveCorr: [
+                { with: 'AUD/USD', strength: 0.94, reason: 'Geographic neighbors, commodities' },
+                { with: 'EUR/USD', strength: 0.77, reason: 'Risk currencies' },
+                { with: 'Dairy Prices', strength: 0.79, reason: 'NZ dairy exporter' }
+            ],
+            negativeCorr: [
+                { with: 'USD/JPY', strength: -0.56, reason: 'Risk-on vs safe haven' },
+                { with: 'USD/CHF', strength: -0.73, reason: 'USD inverse' }
+            ]
+        },
+        {
+            pair: 'Gold (XAU/USD)',
+            positiveCorr: [
+                { with: 'EUR/USD', strength: 0.72, reason: 'Anti-dollar assets' },
+                { with: 'AUD/USD', strength: 0.77, reason: 'Australia gold exports' },
+                { with: 'Silver', strength: 0.88, reason: 'Precious metals move together' }
+            ],
+            negativeCorr: [
+                { with: 'USD/JPY', strength: -0.58, reason: 'Dollar strength inverse' },
+                { with: 'USD Index', strength: -0.79, reason: 'Gold priced in USD' },
+                { with: 'Real Yields', strength: -0.67, reason: 'Opportunity cost of holding gold' }
+            ]
+        }
+    ]
+};
+
+function showCorrelations() {
+    const modal = document.getElementById('correlationsModal');
+    modal.classList.add('active');
+    renderCorrelations();
+}
+
+function closeCorrelations() {
+    document.getElementById('correlationsModal').classList.remove('active');
+}
+
+function renderCorrelations() {
+    const container = document.getElementById('correlationsContainer');
+    
+    let html = '<div class="correlations-grid">';
+    
+    CORRELATIONS_DATA.pairs.forEach(data => {
+        html += `
+            <div class="correlation-section">
+                <div class="corr-pair-header">${data.pair}</div>
+                
+                <div class="corr-category">
+                    <div class="corr-category-title positive">✅ Positive Correlations</div>
+                    <div class="corr-items">
+        `;
+        
+        data.positiveCorr.forEach(c => {
+            const strengthPercent = Math.abs(c.strength * 100);
+            const strengthClass = strengthPercent > 80 ? 'very-strong' : strengthPercent > 60 ? 'strong' : 'moderate';
+            
+            html += `
+                <div class="corr-item ${strengthClass}">
+                    <div class="corr-with">${c.with}</div>
+                    <div class="corr-strength">
+                        <div class="corr-bar">
+                            <div class="corr-bar-fill" style="width: ${strengthPercent}%"></div>
+                        </div>
+                        <span class="corr-value">+${c.strength.toFixed(2)}</span>
+                    </div>
+                    <div class="corr-reason">${c.reason}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+                    </div>
+                </div>
+                
+                <div class="corr-category">
+                    <div class="corr-category-title negative">❌ Negative Correlations</div>
+                    <div class="corr-items">
+        `;
+        
+        data.negativeCorr.forEach(c => {
+            const strengthPercent = Math.abs(c.strength * 100);
+            const strengthClass = strengthPercent > 80 ? 'very-strong' : strengthPercent > 60 ? 'strong' : 'moderate';
+            
+            html += `
+                <div class="corr-item negative ${strengthClass}">
+                    <div class="corr-with">${c.with}</div>
+                    <div class="corr-strength">
+                        <div class="corr-bar">
+                            <div class="corr-bar-fill negative" style="width: ${strengthPercent}%"></div>
+                        </div>
+                        <span class="corr-value">${c.strength.toFixed(2)}</span>
+                    </div>
+                    <div class="corr-reason">${c.reason}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+// Initialize ticker and yields on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Update ticker every 2 seconds
+    updateLiveTicker();
+    setInterval(updateLiveTicker, 2000);
+    
+    // Update yields every 10 seconds
+    updateUSYields();
+    setInterval(updateUSYields, 10000);
 });
