@@ -2560,54 +2560,135 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🔌 WebSocket: ' + (CONFIG.USE_BACKEND ? 'Connecting...' : 'Disabled'));
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });
-// ===== LIVE TICKER & US YIELDS =====
+// ===== LIVE TICKER WITH REAL FOREX DATA =====
 
-// Fetch live ticker data
 async function updateLiveTicker() {
     try {
-        const tickerHTML = CONFIG.TICKER_SYMBOLS.map(symbol => {
-            // Simulated live prices - in production, fetch from API
-            const price = Math.random() * 100;
-            const change = (Math.random() - 0.5) * 2;
-            const changePercent = (change / price * 100).toFixed(2);
-            const isPositive = change > 0;
-            
-            return `
-                <div class="ticker-item ${isPositive ? 'positive' : 'negative'}">
-                    <span class="ticker-symbol">${symbol.name}</span>
-                    <span class="ticker-price">${price.toFixed(symbol.type === 'forex' ? 5 : 2)}</span>
-                    <span class="ticker-change">${isPositive ? '+' : ''}${changePercent}%</span>
-                </div>
-            `;
-        }).join('');
+        // Fetch forex pairs - FMP uses different endpoint for forex
+        const forexPairs = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF'];
+        const forexUrl = `https://financialmodelingprep.com/api/v3/fx/${forexPairs.join(',')}?apikey=${CONFIG.FMP_API_KEY}`;
         
-        document.getElementById('liveTicker').innerHTML = tickerHTML + tickerHTML; // Duplicate for smooth scrolling
+        // Fetch commodities and crypto
+        const otherSymbols = ['XAUUSD', 'XAGUSD', 'BTCUSD', 'DX-Y.NYB']; // DX-Y.NYB is DXY
+        const quotesUrl = `https://financialmodelingprep.com/api/v3/quote/${otherSymbols.join(',')}?apikey=${CONFIG.FMP_API_KEY}`;
+        
+        const [forexResponse, quotesResponse] = await Promise.all([
+            fetch(forexUrl),
+            fetch(quotesUrl)
+        ]);
+        
+        const forexData = await forexResponse.json();
+        const quotesData = await quotesResponse.json();
+        
+        let tickerHTML = '';
+        
+        // Process forex pairs
+        if (Array.isArray(forexData)) {
+            forexData.forEach(quote => {
+                if (quote.ticker) {
+                    const change = (quote.changes || 0);
+                    const isPositive = change > 0;
+                    const price = quote.ask || quote.bid || 0;
+                    
+                    tickerHTML += `
+                        <div class="ticker-item ${isPositive ? 'positive' : 'negative'}">
+                            <span class="ticker-symbol">${quote.ticker.replace('USD', '/USD').replace('JPY', '/JPY').replace('CAD', '/CAD').replace('CHF', '/CHF')}</span>
+                            <span class="ticker-price">${price.toFixed(5)}</span>
+                            <span class="ticker-change">${isPositive ? '+' : ''}${(change * 100).toFixed(2)}%</span>
+                        </div>
+                    `;
+                }
+            });
+        }
+        
+        // Process other assets
+        if (Array.isArray(quotesData)) {
+            quotesData.forEach(quote => {
+                const change = quote.changesPercentage || 0;
+                const isPositive = change > 0;
+                const price = quote.price || 0;
+                
+                let displayName = quote.symbol;
+                let decimals = 2;
+                
+                if (quote.symbol === 'XAUUSD') {
+                    displayName = 'Gold';
+                    decimals = 2;
+                } else if (quote.symbol === 'XAGUSD') {
+                    displayName = 'Silver';
+                    decimals = 3;
+                } else if (quote.symbol === 'BTCUSD') {
+                    displayName = 'Bitcoin';
+                    decimals = 0;
+                } else if (quote.symbol === 'DX-Y.NYB') {
+                    displayName = 'DXY';
+                    decimals = 3;
+                }
+                
+                tickerHTML += `
+                    <div class="ticker-item ${isPositive ? 'positive' : 'negative'}">
+                        <span class="ticker-symbol">${displayName}</span>
+                        <span class="ticker-price">${price.toFixed(decimals)}</span>
+                        <span class="ticker-change">${isPositive ? '+' : ''}${change.toFixed(2)}%</span>
+                    </div>
+                `;
+            });
+        }
+        
+        if (tickerHTML) {
+            document.getElementById('liveTicker').innerHTML = tickerHTML + tickerHTML; // Duplicate for scrolling
+        } else {
+            throw new Error('No ticker data received');
+        }
+        
     } catch (error) {
         console.error('Ticker update error:', error);
+        document.getElementById('liveTicker').innerHTML = `
+            <div class="ticker-loading">⚠️ Connecting to live market data...</div>
+        `;
     }
 }
 
-// Fetch US Treasury Yields
+// Fetch REAL US Treasury Yields
 async function updateUSYields() {
     try {
-        const yieldsHTML = CONFIG.US_YIELDS.map(y => {
-            // Simulated yields - in production, fetch from CNBC/Yahoo Finance API
-            const rate = (Math.random() * 2 + 3).toFixed(3);
-            const change = (Math.random() - 0.5) * 0.1;
+        // Fetch treasury symbols
+        const symbols = ['^TNX', '^FVX', '^IRX']; // 10Y, 5Y, 3M
+        const url = `https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${CONFIG.FMP_API_KEY}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data || data.length === 0) {
+            throw new Error('No yields data');
+        }
+        
+        const yieldsHTML = data.map(quote => {
+            let period = '';
+            if (quote.symbol === '^TNX') period = '10Y';
+            else if (quote.symbol === '^FVX') period = '5Y';
+            else if (quote.symbol === '^IRX') period = '3M';
+            
+            const rate = quote.price || 0;
+            const change = quote.change || 0;
             const isUp = change > 0;
             
             return `
                 <div class="yield-item ${isUp ? 'yield-up' : 'yield-down'}">
-                    <span class="yield-period">${y.period}</span>
-                    <span class="yield-rate">${rate}%</span>
+                    <span class="yield-period">${period}</span>
+                    <span class="yield-rate">${rate.toFixed(3)}%</span>
                     <span class="yield-change">${isUp ? '▲' : '▼'} ${Math.abs(change).toFixed(3)}</span>
                 </div>
             `;
         }).join('');
         
         document.getElementById('yieldsData').innerHTML = yieldsHTML;
+        
     } catch (error) {
         console.error('Yields update error:', error);
+        document.getElementById('yieldsData').innerHTML = `
+            <div class="yield-loading">⚠️ Loading yields data...</div>
+        `;
     }
 }
 
@@ -2766,9 +2847,1070 @@ function renderPsychology() {
     container.innerHTML = html;
 }
 
-// ===== CURRENCY CORRELATIONS =====
+// ===== DXY-CENTRIC MACRO ENGINE WITH REAL DATA =====
 
-const CORRELATIONS_DATA = {
+const MACRO_ENGINE = {
+    // DXY-based correlations (exactly as user specified)
+    assets: {
+        'XAUUSD': {
+            name: 'Gold (XAU/USD)',
+            flag: '🥇',
+            correlation: 'Strong Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'Gold is priced in USD. Strong dollar reduces demand globally.',
+            exception: 'Crisis risk → Gold can rise even if DXY rises.'
+        },
+        'EURUSD': {
+            name: 'EUR/USD',
+            flag: '💶',
+            correlation: 'Strong Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'EUR = ~57% of DXY weight. This is almost mechanical.',
+            exception: 'ECB hawkish surprise can override DXY impact.'
+        },
+        'GBPUSD': {
+            name: 'GBP/USD',
+            flag: '💷',
+            correlation: 'Strong Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'Slightly weaker than EUR but structurally inverse.',
+            exception: 'BoE policy divergence can weaken correlation.'
+        },
+        'AUDUSD': {
+            name: 'AUD/USD',
+            flag: '🇦🇺',
+            correlation: 'Negative (Risk Sensitive)',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'BUT: AUD also depends on China growth, risk sentiment, commodities.',
+            exception: 'Strong China data or commodity rally can override DXY.'
+        },
+        'NZDUSD': {
+            name: 'NZD/USD',
+            flag: '🇳🇿',
+            correlation: 'Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'Similar behavior to AUD but more volatile.',
+            exception: 'Dairy price moves can cause divergence.'
+        },
+        'USDJPY': {
+            name: 'USD/JPY',
+            flag: '🇯🇵',
+            correlation: 'Positive',
+            dxyBullish: 'Bullish',
+            dxyBearish: 'Bearish',
+            reason: 'USD is base currency.',
+            exception: 'During risk-off, JPY strengthens regardless of DXY.'
+        },
+        'USDCAD': {
+            name: 'USD/CAD',
+            flag: '🇨🇦',
+            correlation: 'Positive',
+            dxyBullish: 'Bullish',
+            dxyBearish: 'Bearish',
+            reason: 'BUT: Oil matters heavily.',
+            exception: 'If oil rallies hard → CAD strengthens → USDCAD falls even if DXY slightly bullish.'
+        },
+        'USDCHF': {
+            name: 'USD/CHF',
+            flag: '🇨🇭',
+            correlation: 'Positive',
+            dxyBullish: 'Bullish',
+            dxyBearish: 'Bearish',
+            reason: 'CHF behaves like JPY during fear events.',
+            exception: 'Risk-off can strengthen CHF regardless of DXY.'
+        }
+    },
+    
+    // Correlation strength ranking (as user specified)
+    strengthRanking: {
+        inverse: ['EURUSD', 'Gold (XAUUSD)', 'GBPUSD', 'AUDUSD', 'NZDUSD'],
+        positive: ['USDJPY', 'USDCHF', 'USDCAD']
+    },
+    
+    // Macro driver weights (exactly as user specified)
+    drivers: {
+        DXY: 0.40,
+        Yields: 0.30,
+        Risk: 0.20,
+        Oil: 0.10
+    }
+};
+
+// Fetch REAL macro data
+async function fetchMacroData() {
+    try {
+        // Fetch DXY, Yields, VIX, Oil
+        const symbols = ['DX-Y.NYB', '^TNX', '^VIX', 'CL=F'];
+        const url = `https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${CONFIG.FMP_API_KEY}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const macroData = {
+            dxy: data.find(q => q.symbol === 'DX-Y.NYB') || {},
+            yields: data.find(q => q.symbol === '^TNX') || {},
+            vix: data.find(q => q.symbol === '^VIX') || {},
+            oil: data.find(q => q.symbol === 'CL=F') || {}
+        };
+        
+        return macroData;
+    } catch (error) {
+        console.error('Macro data fetch error:', error);
+        return null;
+    }
+}
+
+// Calculate DXY bias from REAL data
+function calculateDXYBias(dxyData) {
+    if (!dxyData || !dxyData.price) {
+        return {
+            bias: 'Neutral',
+            confidence: 50,
+            momentum: 'Consolidating',
+            session: 'Unknown',
+            price: 0,
+            change: 0,
+            changePercent: 0
+        };
+    }
+    
+    const changePercent = dxyData.changesPercentage || 0;
+    const change = dxyData.change || 0;
+    
+    let bias = 'Neutral';
+    let confidence = 50;
+    let momentum = 'Consolidating';
+    
+    // Determine bias based on real price action
+    if (changePercent > 0.3) {
+        bias = 'Bullish';
+        if (changePercent > 0.7) {
+            confidence = 85;
+            momentum = 'Expanding';
+        } else if (changePercent > 0.5) {
+            confidence = 78;
+            momentum = 'Building';
+        } else {
+            confidence = 65;
+            momentum = 'Mild';
+        }
+    } else if (changePercent < -0.3) {
+        bias = 'Bearish';
+        if (changePercent < -0.7) {
+            confidence = 85;
+            momentum = 'Expanding';
+        } else if (changePercent < -0.5) {
+            confidence = 78;
+            momentum = 'Building';
+        } else {
+            confidence = 65;
+            momentum = 'Mild';
+        }
+    }
+    
+    // Determine session
+    const hour = new Date().getUTCHours();
+    let session = 'Asian';
+    if (hour >= 7 && hour < 16) session = 'London Active';
+    else if (hour >= 13 && hour < 22) session = 'NY Active';
+    else if (hour >= 0 && hour < 9) session = 'Tokyo Active';
+    
+    return {
+        bias,
+        confidence,
+        momentum,
+        session,
+        price: dxyData.price,
+        change,
+        changePercent
+    };
+}
+
+// Calculate full macro engine score
+function calculateMacroScore(macroData) {
+    const scores = {
+        dxy: 0,
+        yields: 0,
+        risk: 0,
+        oil: 0
+    };
+    
+    // DXY Score (40% weight)
+    const dxyChange = macroData.dxy.changesPercentage || 0;
+    if (dxyChange > 0.3) scores.dxy = 1;
+    else if (dxyChange < -0.3) scores.dxy = -1;
+    
+    // Yields Score (30% weight)
+    const yieldsChange = macroData.yields.changesPercentage || 0;
+    if (yieldsChange > 1) scores.yields = 1;
+    else if (yieldsChange < -1) scores.yields = -1;
+    
+    // Risk Score (20% weight) - VIX inverse
+    const vixChange = macroData.vix.changesPercentage || 0;
+    if (vixChange < -5) scores.risk = 1; // VIX down = risk on
+    else if (vixChange > 5) scores.risk = -1; // VIX up = risk off
+    
+    // Oil Score (10% weight)
+    const oilChange = macroData.oil.changesPercentage || 0;
+    if (oilChange > 2) scores.oil = 1;
+    else if (oilChange < -2) scores.oil = -1;
+    
+    return scores;
+}
+
+// Project asset biases with REAL calculations
+function projectAssetBiases(dxyBias, macroScores) {
+    const projections = {};
+    
+    Object.entries(MACRO_ENGINE.assets).forEach(([symbol, asset]) => {
+        let baseConfidence = dxyBias.confidence;
+        
+        // Calculate weighted confidence
+        let weightedScore = 
+            macroScores.dxy * MACRO_ENGINE.drivers.DXY +
+            macroScores.yields * MACRO_ENGINE.drivers.Yields +
+            macroScores.risk * MACRO_ENGINE.drivers.Risk +
+            macroScores.oil * MACRO_ENGINE.drivers.Oil;
+        
+        // Adjust for correlation type
+        let projectedBias = 'Neutral';
+        let finalConfidence = 50;
+        
+        if (asset.correlation.includes('Negative')) {
+            // Inverse correlation
+            if (dxyBias.bias === 'Bullish') {
+                projectedBias = 'Bearish';
+                finalConfidence = Math.round(baseConfidence * (1 + Math.abs(weightedScore)));
+            } else if (dxyBias.bias === 'Bearish') {
+                projectedBias = 'Bullish';
+                finalConfidence = Math.round(baseConfidence * (1 + Math.abs(weightedScore)));
+            }
+        } else if (asset.correlation.includes('Positive')) {
+            // Direct correlation
+            if (dxyBias.bias === 'Bullish') {
+                projectedBias = 'Bullish';
+                finalConfidence = Math.round(baseConfidence * (1 + Math.abs(weightedScore)));
+            } else if (dxyBias.bias === 'Bearish') {
+                projectedBias = 'Bearish';
+                finalConfidence = Math.round(baseConfidence * (1 + Math.abs(weightedScore)));
+            }
+        }
+        
+        // Cap confidence at 95%
+        finalConfidence = Math.min(95, finalConfidence);
+        
+        // Determine strength
+        let strength = 'Weak';
+        let strengthPrefix = '';
+        if (finalConfidence >= 80) {
+            strength = 'Strong';
+            strengthPrefix = 'Strong ';
+        } else if (finalConfidence >= 65) {
+            strength = 'Moderate';
+            strengthPrefix = 'Moderate ';
+        }
+        
+        projections[symbol] = {
+            bias: projectedBias,
+            confidence: finalConfidence,
+            strength: strength,
+            fullBias: `${strengthPrefix}${projectedBias}`
+        };
+    });
+    
+    return projections;
+}
+
+function showCorrelations() {
+    document.getElementById('correlationsModal').classList.add('active');
+    renderMacroEngine();
+}
+
+function closeCorrelations() {
+    document.getElementById('correlationsModal').classList.remove('active');
+}
+
+async function renderMacroEngine() {
+    const container = document.getElementById('correlationsContainer');
+    
+    // Show loading
+    container.innerHTML = `
+        <div class="loading-container">
+            <div class="loading-spinner-advanced">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+            </div>
+            <p class="loading-message">🔥 Calculating DXY bias and macro projections...</p>
+        </div>
+    `;
+    
+    // Fetch REAL macro data
+    const macroData = await fetchMacroData();
+    
+    if (!macroData) {
+        container.innerHTML = '<div class="error-message">⚠️ Unable to fetch macro data. Please refresh.</div>';
+        return;
+    }
+    
+    const dxyBias = calculateDXYBias(macroData.dxy);
+    const macroScores = calculateMacroScore(macroData);
+    const projections = projectAssetBiases(dxyBias, macroScores);
+    
+    let html = `
+        <div class="macro-engine-container">
+            <!-- Level 1: Auto DXY Bias Detection -->
+            <div class="engine-section level-1">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>LEVEL 1 — AUTO DXY BIAS DETECTION</h3>
+                </div>
+                <div class="engine-subheader">Driver: U.S. Dollar Index</div>
+                
+                <div class="dxy-output-box">
+                    <div class="output-row">
+                        <span class="output-label">DXY Bias:</span>
+                        <span class="output-value bias-${dxyBias.bias.toLowerCase()}">${dxyBias.bias}</span>
+                    </div>
+                    <div class="output-row">
+                        <span class="output-label">Confidence:</span>
+                        <span class="output-value">${dxyBias.confidence}%</span>
+                    </div>
+                    <div class="output-row">
+                        <span class="output-label">Momentum:</span>
+                        <span class="output-value">${dxyBias.momentum}</span>
+                    </div>
+                    <div class="output-row">
+                        <span class="output-label">Session:</span>
+                        <span class="output-value">${dxyBias.session}</span>
+                    </div>
+                    <div class="output-row live-data">
+                        <span class="output-label">DXY Price:</span>
+                        <span class="output-value">${dxyBias.price.toFixed(3)}</span>
+                        <span class="output-change ${dxyBias.changePercent > 0 ? 'positive' : 'negative'}">
+                            ${dxyBias.changePercent > 0 ? '+' : ''}${dxyBias.changePercent.toFixed(2)}%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="engine-note">
+                    💡 <strong>This bias projects 70% of major currency moves</strong>
+                </div>
+            </div>
+
+            <!-- Level 2: Asset Bias Projection -->
+            <div class="engine-section level-2">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>LEVEL 2 — AUTO ASSET BIAS PROJECTION</h3>
+                </div>
+                <div class="engine-subheader">Once DXY bias is known:</div>
+                
+                <div class="projection-table-modern">
+                    <div class="proj-table-header">
+                        <div class="proj-col">DXY</div>
+                        <div class="proj-col">Gold</div>
+                        <div class="proj-col">EURUSD</div>
+                        <div class="proj-col">GBPUSD</div>
+                        <div class="proj-col">USDJPY</div>
+                    </div>
+                    <div class="proj-table-row">
+                        <div class="proj-col bias-cell bias-${dxyBias.bias.toLowerCase()}">${dxyBias.bias}</div>
+                        <div class="proj-col bias-cell bias-${projections['XAUUSD']?.bias.toLowerCase()}">${projections['XAUUSD']?.bias}</div>
+                        <div class="proj-col bias-cell bias-${projections['EURUSD']?.bias.toLowerCase()}">${projections['EURUSD']?.bias}</div>
+                        <div class="proj-col bias-cell bias-${projections['GBPUSD']?.bias.toLowerCase()}">${projections['GBPUSD']?.bias}</div>
+                        <div class="proj-col bias-cell bias-${projections['USDJPY']?.bias.toLowerCase()}">${projections['USDJPY']?.bias}</div>
+                    </div>
+                </div>
+                
+                <div class="engine-note">
+                    ⚠️ <strong>But that's just layer 1. Now we add filters.</strong>
+                </div>
+            </div>
+
+            <!-- Level 3: Full Intermarket Engine -->
+            <div class="engine-section level-3">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>LEVEL 3 — FULL INTERMARKET ENGINE</h3>
+                </div>
+                <div class="engine-subheader">We add 4 macro drivers:</div>
+                
+                <div class="drivers-display">
+                    <div class="driver-box">
+                        <div class="driver-num">1️⃣</div>
+                        <div class="driver-name">DXY</div>
+                        <div class="driver-weight">${Math.round(MACRO_ENGINE.drivers.DXY * 100)}%</div>
+                        <div class="driver-status ${macroScores.dxy > 0 ? 'bullish' : macroScores.dxy < 0 ? 'bearish' : 'neutral'}">
+                            ${macroScores.dxy > 0 ? 'Bullish' : macroScores.dxy < 0 ? 'Bearish' : 'Neutral'}
+                        </div>
+                    </div>
+                    <div class="driver-box">
+                        <div class="driver-num">2️⃣</div>
+                        <div class="driver-name">US 10Y Yields</div>
+                        <div class="driver-weight">${Math.round(MACRO_ENGINE.drivers.Yields * 100)}%</div>
+                        <div class="driver-status ${macroScores.yields > 0 ? 'rising' : macroScores.yields < 0 ? 'falling' : 'flat'}">
+                            ${macroScores.yields > 0 ? 'Rising' : macroScores.yields < 0 ? 'Falling' : 'Flat'}
+                        </div>
+                        <div class="driver-value">${(macroData.yields.price || 0).toFixed(3)}%</div>
+                    </div>
+                    <div class="driver-box">
+                        <div class="driver-num">3️⃣</div>
+                        <div class="driver-name">Oil</div>
+                        <div class="driver-weight">${Math.round(MACRO_ENGINE.drivers.Oil * 100)}%</div>
+                        <div class="driver-status ${macroScores.oil > 0 ? 'rising' : macroScores.oil < 0 ? 'falling' : 'flat'}">
+                            ${macroScores.oil > 0 ? 'Rising' : macroScores.oil < 0 ? 'Falling' : 'Flat'}
+                        </div>
+                        <div class="driver-value">$${(macroData.oil.price || 0).toFixed(2)}</div>
+                    </div>
+                    <div class="driver-box">
+                        <div class="driver-num">4️⃣</div>
+                        <div class="driver-name">Risk Sentiment</div>
+                        <div class="driver-weight">${Math.round(MACRO_ENGINE.drivers.Risk * 100)}%</div>
+                        <div class="driver-status ${macroScores.risk > 0 ? 'risk-on' : macroScores.risk < 0 ? 'risk-off' : 'neutral'}">
+                            ${macroScores.risk > 0 ? 'Risk-On' : macroScores.risk < 0 ? 'Risk-Off' : 'Neutral'}
+                        </div>
+                        <div class="driver-value">VIX: ${(macroData.vix.price || 0).toFixed(2)}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example Output -->
+            <div class="engine-section example-output">
+                <div class="engine-header">
+                    <span class="engine-icon">🧮</span>
+                    <h3>LIVE MACRO ENGINE OUTPUT</h3>
+                </div>
+                
+                <div class="output-box-main">
+                    <div class="output-section">
+                        <h4>Macro Engine Status:</h4>
+                        <div class="status-grid">
+                            <div class="status-item">
+                                <span class="status-label">DXY:</span>
+                                <span class="status-val">${dxyBias.bias} (${dxyBias.confidence >= 75 ? 'Strong' : 'Moderate'})</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Yields:</span>
+                                <span class="status-val">${macroScores.yields > 0 ? 'Rising' : macroScores.yields < 0 ? 'Falling' : 'Neutral'}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Risk:</span>
+                                <span class="status-val">${macroScores.risk > 0 ? 'On' : macroScores.risk < 0 ? 'Off' : 'Neutral'}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Oil:</span>
+                                <span class="status-val">${macroScores.oil > 0 ? 'Rising' : macroScores.oil < 0 ? 'Falling' : 'Flat'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="output-section">
+                        <h4>Projected Bias:</h4>
+                        <div class="bias-grid">
+    `;
+    
+    // Add all projections
+    Object.entries(projections).forEach(([symbol, proj]) => {
+        const asset = MACRO_ENGINE.assets[symbol];
+        html += `
+            <div class="bias-item">
+                <span class="bias-asset">${asset.name}:</span>
+                <span class="bias-result ${proj.bias.toLowerCase()}">${proj.fullBias} (${proj.confidence}%)</span>
+            </div>
+        `;
+    });
+    
+    html += `
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="engine-note highlight">
+                    ✅ <strong>That is real macro alignment.</strong>
+                </div>
+            </div>
+
+            <!-- Master Correlation Map -->
+            <div class="engine-section correlation-map">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>MASTER INTERMARKET CORRELATION MAP</h3>
+                    <p class="engine-subtitle">(Using U.S. Dollar Index as base driver)</p>
+                </div>
+                
+                <div class="corr-cards-grid">
+    `;
+    
+    // Add correlation cards
+    Object.entries(MACRO_ENGINE.assets).forEach(([symbol, asset]) => {
+        html += `
+            <div class="corr-card-modern">
+                <div class="corr-card-title">
+                    <span class="corr-flag-big">${asset.flag}</span>
+                    <span class="corr-name-big">${asset.name}</span>
+                </div>
+                <div class="corr-detail">
+                    <strong>Correlation with DXY:</strong> ${asset.correlation}
+                </div>
+                <div class="corr-reactions-box">
+                    <div class="reaction-line">
+                        <span class="reaction-cond">DXY Bullish →</span>
+                        <span class="reaction-res ${asset.dxyBullish.toLowerCase()}">${asset.dxyBullish}</span>
+                    </div>
+                    <div class="reaction-line">
+                        <span class="reaction-cond">DXY Bearish →</span>
+                        <span class="reaction-res ${asset.dxyBearish.toLowerCase()}">${asset.dxyBearish}</span>
+                    </div>
+                </div>
+                <div class="corr-reason-box">
+                    <strong>Reason:</strong> ${asset.reason}
+                </div>
+                <div class="corr-exception-box">
+                    ⚠️ <strong>Exception:</strong> ${asset.exception}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+
+            <!-- Structured Summary Table -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">📊</span>
+                    <h3>STRUCTURED SUMMARY TABLE</h3>
+                </div>
+                
+                <div class="summary-table-modern">
+                    <div class="sum-header">
+                        <div class="sum-cell">Asset</div>
+                        <div class="sum-cell">Correlation vs DXY</div>
+                        <div class="sum-cell">If DXY Bullish</div>
+                        <div class="sum-cell">If DXY Bearish</div>
+                    </div>
+    `;
+    
+    Object.entries(MACRO_ENGINE.assets).forEach(([symbol, asset]) => {
+        html += `
+            <div class="sum-row">
+                <div class="sum-cell"><strong>${asset.name}</strong></div>
+                <div class="sum-cell">${asset.correlation}</div>
+                <div class="sum-cell ${asset.dxyBullish.toLowerCase()}-text">${asset.dxyBullish}</div>
+                <div class="sum-cell ${asset.dxyBearish.toLowerCase()}-text">${asset.dxyBearish}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+
+            <!-- Correlation Strength Ranking -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">⚠️</span>
+                    <h3>CORRELATION STRENGTH RANKING</h3>
+                </div>
+                
+                <div class="ranking-boxes">
+                    <div class="ranking-box inverse">
+                        <h4>From strongest to weakest inverse:</h4>
+                        <ol class="ranking-list-modern">
+                            ${MACRO_ENGINE.strengthRanking.inverse.map(asset => `<li>${asset}</li>`).join('')}
+                        </ol>
+                    </div>
+                    <div class="ranking-box positive">
+                        <h4>Strongest positive:</h4>
+                        <ol class="ranking-list-modern">
+                            ${MACRO_ENGINE.strengthRanking.positive.map(asset => `<li>${asset}</li>`).join('')}
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- What Traders Get Wrong -->
+            <div class="engine-section warning-box">
+                <div class="engine-header">
+                    <span class="engine-icon">🧠</span>
+                    <h3>WHAT MOST TRADERS GET WRONG</h3>
+                </div>
+                
+                <div class="warning-content-box">
+                    <p class="warning-title"><strong>Correlation ≠ causation.</strong></p>
+                    <p>DXY doesn't "cause" moves. Macro expectations (rates, inflation, growth) drive both. DXY is just a reflection.</p>
+                    <p>If you blindly trade "DXY down → buy gold" without:</p>
+                    <ul class="warning-list">
+                        <li>Yield context</li>
+                        <li>News context</li>
+                        <li>Session liquidity</li>
+                    </ul>
+                    <p class="warning-danger">⚠️ <strong>You will lose money.</strong></p>
+                </div>
+            </div>
+
+            <!-- Hard Questions -->
+            <div class="engine-section challenge-box">
+                <div class="engine-header">
+                    <span class="engine-icon">🚨</span>
+                    <h3>NOW HERE'S THE HARD QUESTION</h3>
+                </div>
+                
+                <div class="challenge-content">
+                    <p class="challenge-intro">You trade gold heavily. Do you actually check:</p>
+                    <ul class="challenge-list">
+                        <li>✓ US 10Y real yields?</li>
+                        <li>✓ Correlation breakdown days?</li>
+                        <li>✓ Pre-NFP compression?</li>
+                        <li>✓ Liquidity void zones?</li>
+                    </ul>
+                    <p class="challenge-note">⚠️ <strong>Where This Fails:</strong> If CPI prints far above forecast: DXY spikes, Yields spike, Gold dumps. BUT if market expected even worse? Gold may reverse. Your engine must factor surprise vs expectation, not just direction.</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+    dxyCorrelations: {
+        'XAUUSD': {
+            name: 'Gold (XAU/USD)',
+            flag: '🥇',
+            correlation: 'Strong Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'Gold is priced in USD. Strong dollar reduces demand globally.',
+            exception: 'Crisis risk → Gold can rise even if DXY rises.',
+            weight: 0.85
+        },
+        'EURUSD': {
+            name: 'EUR/USD',
+            flag: '💶',
+            correlation: 'Strong Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'EUR = ~57% of DXY weight. This is almost mechanical.',
+            exception: 'ECB hawkish surprise can override DXY impact.',
+            weight: 0.92
+        },
+        'GBPUSD': {
+            name: 'GBP/USD',
+            flag: '💷',
+            correlation: 'Strong Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'Slightly weaker than EUR but structurally inverse.',
+            exception: 'BoE policy divergence can weaken correlation.',
+            weight: 0.88
+        },
+        'AUDUSD': {
+            name: 'AUD/USD',
+            flag: '🇦🇺',
+            correlation: 'Negative (Risk Sensitive)',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'BUT: AUD also depends on China growth, risk sentiment, commodities.',
+            exception: 'Strong China data or commodity rally can override DXY.',
+            weight: 0.75
+        },
+        'NZDUSD': {
+            name: 'NZD/USD',
+            flag: '🇳🇿',
+            correlation: 'Negative',
+            dxyBullish: 'Bearish',
+            dxyBearish: 'Bullish',
+            reason: 'Similar behavior to AUD but more volatile.',
+            exception: 'Dairy price moves can cause divergence.',
+            weight: 0.73
+        },
+        'USDJPY': {
+            name: 'USD/JPY',
+            flag: '🇯🇵',
+            correlation: 'Positive',
+            dxyBullish: 'Bullish',
+            dxyBearish: 'Bearish',
+            reason: 'USD is base currency.',
+            exception: 'During risk-off, JPY strengthens regardless of DXY.',
+            weight: 0.82
+        },
+        'USDCAD': {
+            name: 'USD/CAD',
+            flag: '🇨🇦',
+            correlation: 'Positive',
+            dxyBullish: 'Bullish',
+            dxyBearish: 'Bearish',
+            reason: 'BUT: Oil matters heavily.',
+            exception: 'If oil rallies hard → CAD strengthens → USDCAD falls even if DXY bullish.',
+            weight: 0.68
+        },
+        'USDCHF': {
+            name: 'USD/CHF',
+            flag: '🇨🇭',
+            correlation: 'Positive',
+            dxyBullish: 'Bullish',
+            dxyBearish: 'Bearish',
+            reason: 'CHF behaves like JPY during fear events.',
+            exception: 'Risk-off can strengthen CHF regardless of DXY.',
+            weight: 0.79
+        }
+    },
+    
+    // Correlation strength ranking
+    strengthRanking: {
+        inverseStrong: ['EURUSD', 'XAUUSD', 'GBPUSD', 'AUDUSD', 'NZDUSD'],
+        positiveStrong: ['USDJPY', 'USDCHF', 'USDCAD']
+    },
+    
+    // Macro drivers with weights
+    drivers: {
+        DXY: { weight: 0.40, name: 'U.S. Dollar Index' },
+        YIELDS: { weight: 0.30, name: 'US 10Y Yields' },
+        RISK: { weight: 0.20, name: 'Risk Sentiment' },
+        OIL: { weight: 0.10, name: 'Oil Prices' }
+    }
+};
+
+// Calculate DXY bias (this would use real-time data in production)
+async function calculateDXYBias() {
+    try {
+        // Fetch DXY quote
+        const url = `https://financialmodelingprep.com/api/v3/quote/DXY?apikey=${CONFIG.FMP_API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data && data[0]) {
+            const dxy = data[0];
+            const change = dxy.changesPercentage || 0;
+            
+            // Determine bias
+            let bias = 'Neutral';
+            let confidence = 50;
+            let momentum = 'Consolidating';
+            
+            if (change > 0.3) {
+                bias = 'Bullish';
+                confidence = Math.min(85, 60 + Math.abs(change) * 10);
+                momentum = change > 0.5 ? 'Expanding' : 'Building';
+            } else if (change < -0.3) {
+                bias = 'Bearish';
+                confidence = Math.min(85, 60 + Math.abs(change) * 10);
+                momentum = change < -0.5 ? 'Expanding' : 'Building';
+            }
+            
+            return {
+                bias,
+                confidence: Math.round(confidence),
+                momentum,
+                price: dxy.price,
+                change: dxy.change,
+                changePercent: dxy.changesPercentage
+            };
+        }
+    } catch (error) {
+        console.error('DXY bias calculation error:', error);
+    }
+    
+    // Fallback
+    return {
+        bias: 'Neutral',
+        confidence: 50,
+        momentum: 'Consolidating',
+        price: 0,
+        change: 0,
+        changePercent: 0
+    };
+}
+
+// Project asset biases based on DXY
+function projectAssetBiases(dxyBias) {
+    const projections = {};
+    
+    Object.entries(MACRO_ENGINE.dxyCorrelations).forEach(([symbol, data]) => {
+        let projectedBias = 'Neutral';
+        let confidence = 50;
+        
+        if (dxyBias.bias === 'Bullish') {
+            projectedBias = data.dxyBullish;
+            confidence = Math.round(dxyBias.confidence * data.weight);
+        } else if (dxyBias.bias === 'Bearish') {
+            projectedBias = data.dxyBearish;
+            confidence = Math.round(dxyBias.confidence * data.weight);
+        }
+        
+        projections[symbol] = {
+            bias: projectedBias,
+            confidence,
+            strength: confidence > 80 ? 'Strong' : confidence > 60 ? 'Moderate' : 'Weak'
+        };
+    });
+    
+    return projections;
+}
+
+function showCorrelations() {
+    const modal = document.getElementById('correlationsModal');
+    modal.classList.add('active');
+    renderMacroEngine();
+}
+
+function closeCorrelations() {
+    document.getElementById('correlationsModal').classList.remove('active');
+}
+
+async function renderMacroEngine() {
+    const container = document.getElementById('correlationsContainer');
+    
+    // Show loading
+    container.innerHTML = `
+        <div class="loading-container">
+            <div class="loading-spinner-advanced">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+            </div>
+            <p class="loading-message">Calculating DXY bias and projections...</p>
+        </div>
+    `;
+    
+    // Calculate DXY bias
+    const dxyBias = await calculateDXYBias();
+    const projections = projectAssetBiases(dxyBias);
+    
+    let html = `
+        <div class="macro-engine-container">
+            <!-- Level 1: DXY Bias Detection -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>LEVEL 1 — AUTO DXY BIAS DETECTION</h3>
+                </div>
+                <div class="dxy-bias-card">
+                    <div class="bias-main">
+                        <div class="bias-label">DXY Bias:</div>
+                        <div class="bias-value ${dxyBias.bias.toLowerCase()}">${dxyBias.bias}</div>
+                    </div>
+                    <div class="bias-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Confidence:</span>
+                            <span class="stat-value">${dxyBias.confidence}%</span>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${dxyBias.confidence}%"></div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Momentum:</span>
+                            <span class="stat-value">${dxyBias.momentum}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">DXY Price:</span>
+                            <span class="stat-value">${dxyBias.price.toFixed(3)}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Change:</span>
+                            <span class="stat-value ${dxyBias.changePercent > 0 ? 'positive' : 'negative'}">
+                                ${dxyBias.changePercent > 0 ? '+' : ''}${dxyBias.changePercent.toFixed(2)}%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="bias-note">
+                        💡 This bias projects 70% of major currency moves
+                    </div>
+                </div>
+            </div>
+
+            <!-- Level 2: Asset Bias Projection -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>LEVEL 2 — AUTO ASSET BIAS PROJECTION</h3>
+                </div>
+                <div class="projection-table">
+                    <div class="projection-header">
+                        <div class="proj-col">Asset</div>
+                        <div class="proj-col">Projected Bias</div>
+                        <div class="proj-col">Confidence</div>
+                        <div class="proj-col">Strength</div>
+                    </div>
+    `;
+    
+    Object.entries(projections).forEach(([symbol, proj]) => {
+        const asset = MACRO_ENGINE.dxyCorrelations[symbol];
+        html += `
+            <div class="projection-row">
+                <div class="proj-col">
+                    <span class="asset-flag">${asset.flag}</span>
+                    <span class="asset-name">${asset.name}</span>
+                </div>
+                <div class="proj-col">
+                    <span class="bias-badge ${proj.bias.toLowerCase()}">${proj.bias}</span>
+                </div>
+                <div class="proj-col">
+                    <span class="confidence-value">${proj.confidence}%</span>
+                </div>
+                <div class="proj-col">
+                    <span class="strength-badge strength-${proj.strength.toLowerCase()}">${proj.strength}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+
+            <!-- Master Correlation Map -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>MASTER INTERMARKET CORRELATION MAP</h3>
+                    <p class="engine-subtitle">(Using U.S. Dollar Index as base driver)</p>
+                </div>
+                <div class="correlation-cards">
+    `;
+    
+    Object.entries(MACRO_ENGINE.dxyCorrelations).forEach(([symbol, data]) => {
+        html += `
+            <div class="correlation-card">
+                <div class="corr-card-header">
+                    <span class="corr-flag">${data.flag}</span>
+                    <span class="corr-name">${data.name}</span>
+                </div>
+                <div class="corr-type">Correlation with DXY: <strong>${data.correlation}</strong></div>
+                <div class="corr-reactions">
+                    <div class="reaction-item">
+                        <span class="reaction-if">DXY Bullish →</span>
+                        <span class="reaction-result bearish">${data.dxyBullish}</span>
+                    </div>
+                    <div class="reaction-item">
+                        <span class="reaction-if">DXY Bearish →</span>
+                        <span class="reaction-result bullish">${data.dxyBearish}</span>
+                    </div>
+                </div>
+                <div class="corr-reason"><strong>Reason:</strong> ${data.reason}</div>
+                <div class="corr-exception">⚠️ <strong>Exception:</strong> ${data.exception}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+
+            <!-- Structured Summary Table -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">📊</span>
+                    <h3>STRUCTURED SUMMARY TABLE</h3>
+                </div>
+                <div class="summary-table">
+                    <div class="summary-header">
+                        <div class="sum-col">Asset</div>
+                        <div class="sum-col">Correlation vs DXY</div>
+                        <div class="sum-col">If DXY Bullish</div>
+                        <div class="sum-col">If DXY Bearish</div>
+                    </div>
+    `;
+    
+    Object.entries(MACRO_ENGINE.dxyCorrelations).forEach(([symbol, data]) => {
+        html += `
+            <div class="summary-row">
+                <div class="sum-col"><strong>${data.name}</strong></div>
+                <div class="sum-col">${data.correlation}</div>
+                <div class="sum-col bearish-text">${data.dxyBullish}</div>
+                <div class="sum-col bullish-text">${data.dxyBearish}</div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+
+            <!-- Correlation Strength Ranking -->
+            <div class="engine-section">
+                <div class="engine-header">
+                    <span class="engine-icon">⚠️</span>
+                    <h3>CORRELATION STRENGTH RANKING</h3>
+                </div>
+                <div class="ranking-grid">
+                    <div class="ranking-card inverse">
+                        <h4>Strongest Inverse (Negative)</h4>
+                        <ol class="ranking-list">
+                            ${MACRO_ENGINE.strengthRanking.inverseStrong.map(s => `
+                                <li>${MACRO_ENGINE.dxyCorrelations[s].name}</li>
+                            `).join('')}
+                        </ol>
+                    </div>
+                    <div class="ranking-card positive">
+                        <h4>Strongest Positive</h4>
+                        <ol class="ranking-list">
+                            ${MACRO_ENGINE.strengthRanking.positiveStrong.map(s => `
+                                <li>${MACRO_ENGINE.dxyCorrelations[s].name}</li>
+                            `).join('')}
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- What Traders Get Wrong -->
+            <div class="engine-section warning-section">
+                <div class="engine-header">
+                    <span class="engine-icon">🧠</span>
+                    <h3>WHAT MOST TRADERS GET WRONG</h3>
+                </div>
+                <div class="warning-content">
+                    <p><strong>Correlation ≠ Causation</strong></p>
+                    <p>DXY doesn't "cause" moves. Macro expectations (rates, inflation, growth) drive both. DXY is just a reflection.</p>
+                    <p>If you blindly trade "DXY down → buy gold" without:</p>
+                    <ul>
+                        <li>Yield context</li>
+                        <li>News context</li>
+                        <li>Session liquidity</li>
+                    </ul>
+                    <p class="warning-highlight">⚠️ You will lose money.</p>
+                </div>
+            </div>
+
+            <!-- Level 3: Full Intermarket Engine (Preview) -->
+            <div class="engine-section level-3">
+                <div class="engine-header">
+                    <span class="engine-icon">🔥</span>
+                    <h3>LEVEL 3 — FULL INTERMARKET ENGINE</h3>
+                    <p class="engine-subtitle">4 Macro Drivers Weighted System</p>
+                </div>
+                <div class="drivers-grid">
+    `;
+    
+    Object.entries(MACRO_ENGINE.drivers).forEach(([key, driver]) => {
+        const percentage = Math.round(driver.weight * 100);
+        html += `
+            <div class="driver-card">
+                <div class="driver-name">${driver.name}</div>
+                <div class="driver-weight">${percentage}%</div>
+                <div class="driver-bar">
+                    <div class="driver-fill" style="width: ${percentage}%"></div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+                <div class="level-3-note">
+                    <p>💡 Full engine combines all 4 drivers to calculate precise bias probabilities.</p>
+                    <p>🚧 Complete implementation requires real-time yield data, VIX, and oil prices.</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
     pairs: [
         { 
             pair: 'EUR/USD',
