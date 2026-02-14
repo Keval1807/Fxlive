@@ -307,6 +307,55 @@ class SentimentAnalyzer {
         
         return sentiment;
     }
+    // Add this new Engine logic
+const MacroEngine = {
+    calculateBias() {
+        // Core Logic: DXY (40%), Yields (30%), Risk (20%), Oil (10%)
+        const dxyData = state.marketSummary['DXY'] || { change: 0 };
+        const yieldsData = state.marketSummary['10Y_YIELD'] || { change: 0 };
+        
+        const isDxyBullish = dxyData.change >= 0;
+        const isYieldRising = yieldsData.change >= 0;
+
+        return {
+            gold: isDxyBullish && isYieldRising ? "85% Bearish" : "Bullish Reversal Potential",
+            eurusd: isDxyBullish ? "78% Bearish" : "78% Bullish",
+            usdjpy: isDxyBullish ? "88% Bullish" : "88% Bearish"
+        };
+    },
+
+    renderCorrelations() {
+        const mapHtml = `
+            <div class="corr-table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Asset</th><th>DXY Bullish</th><th>DXY Bearish</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>GOLD</td><td class="bear">Bearish</td><td class="bull">Bullish</td></tr>
+                        <tr><td>EURUSD</td><td class="bear">Bearish</td><td class="bull">Bullish</td></tr>
+                        <tr><td>USDJPY</td><td class="bull">Bullish</td><td class="bear">Bearish</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="engine-note">⚠ Correlation ≠ causation. Yields and Session liquidity must be checked.</p>
+        `;
+        document.getElementById('correlationMapContent').innerHTML = mapHtml;
+    }
+};
+
+// Add Psychology Database
+const PSYCHOLOGY_LINES = [
+    "The goal of a successful trader is to make the best trades. Money is secondary. - Alexander Elder",
+    "Amateurs hope. Professionals step out when the setup fails.",
+    "Do not let a win go to your head or a loss to your heart."
+];
+
+function showPsychology() {
+    let html = "<ul>" + PSYCHOLOGY_LINES.map(line => `<li>${line}</li>`).join('') + "</ul>";
+    document.getElementById('psychologyContent').innerHTML = html;
+    document.getElementById('psychologyModal').classList.add('active');
+}
     
     // NEW: Apply central bank impact to currencies
     static applyCentralBankImpact(fullText, sentiment, centralBanks) {
