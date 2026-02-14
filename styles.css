@@ -3683,3 +3683,47 @@ body {
         grid-template-columns: 1fr;
     }
 }
+/* Ticker & Engine Styles */
+.top-live-ticker {
+    background: #000;
+    color: #fff;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border-bottom: 1px solid var(--accent-primary);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.ticker-content {
+    display: flex;
+    white-space: nowrap;
+    animation: tickerMove 40s linear infinite;
+}
+
+@keyframes tickerMove {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+
+.ticker-item {
+    padding: 0 25px;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+}
+
+.corr-table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.corr-table-wrapper th, .corr-table-wrapper td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.bull { color: var(--accent-success); font-weight: bold; }
+.bear { color: var(--accent-danger); font-weight: bold; }
