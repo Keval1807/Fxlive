@@ -103,25 +103,30 @@
                 </div>
             </div>
 
-            <!-- Live Ticker - Currencies, Commodities, Crypto -->
-            <div class="live-ticker-container">
-                <div class="ticker-wrapper">
-                    <div class="ticker-track" id="liveTicker">
-                        <div class="ticker-loading">Loading live prices...</div>
-                    </div>
-                </div>
-            </div>
+          <div class="top-live-ticker" id="topTicker">
+    <div class="ticker-content" id="tickerItems">
+        </div>
+</div>
 
-            <!-- US Treasury Yields Widget -->
-            <div class="yields-widget">
-                <div class="yields-header">
-                    <span class="yields-icon">📈</span>
-                    <span class="yields-title">US Treasury Yields</span>
-                </div>
-                <div class="yields-data" id="yieldsData">
-                    <div class="yield-loading">Loading yields...</div>
-                </div>
-            </div>
+<div id="psychologyModal" class="modal">
+    <div class="modal-container large">
+        <div class="modal-header">
+            <h2 class="modal-title">🧠 Trading Psychology & Risk Masterclass</h2>
+            <button class="modal-close-btn" onclick="closePsychology()">×</button>
+        </div>
+        <div class="modal-body" id="psychologyContent"></div>
+    </div>
+</div>
+
+<div id="correlationModal" class="modal">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h2 class="modal-title">🔥 MASTER INTERMARKET CORRELATION MAP</h2>
+            <button class="modal-close-btn" onclick="closeCorrelations()">×</button>
+        </div>
+        <div class="modal-body" id="correlationMapContent"></div>
+    </div>
+</div>
 
             <!-- Status Dashboard -->
             <div class="status-dashboard">
