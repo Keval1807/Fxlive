@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForexLive Intelligence - Professional Trading Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Live Ticker -->
+    <div class="live-ticker-container">
+        <div class="ticker-wrapper">
+            <div class="ticker-content" id="tickerContent">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="header-content">
+                <div class="brand">
+                    <div class="live-indicator">
+                        <span class="pulse"></span>
+                        <span class="live-text">LIVE</span>
+                    </div>
+                    <h1>ForexLive<span class="accent">Intelligence</span></h1>
+                </div>
+                
+                <nav class="main-nav">
+                    <button class="nav-btn active" data-page="dashboard" onclick="switchPage('dashboard')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                        </svg>
+                        Dashboard
+                    </button>
+                    <button class="nav-btn" data-page="correlations" onclick="switchPage('correlations')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        Correlations
+                    </button>
+                    <button class="nav-btn" data-page="psychology" onclick="switchPage('psychology')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a10 10 0 0 1 10 10c0 6-4 9-10 9s-10-3-10-9a10 10 0 0 1 10-10z"></path>
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                        </svg>
+                        Psychology
+                    </button>
+                    <button class="nav-btn" data-page="dxy-engine" onclick="switchPage('dxy-engine')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                        DXY Engine
+                    </button>
+                </nav>
+
+                <button class="refresh-btn" onclick="refreshAllData()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Page -->
+        <div class="page active" id="dashboard">
+            <div class="dashboard-grid">
+                <!-- US Yields Widget -->
+                <div class="widget yields-widget">
+                    <div class="widget-header">
+                        <h2>🇺🇸 US Treasury Yields</h2>
+                        <span class="data-source">Source: CNBC</span>
+                    </div>
+                    <div class="widget-content">
+                        <div class="yields-grid" id="yieldsGrid">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gold News Widget -->
+                <div class="widget news-widget">
+                    <div class="widget-header">
+                        <h2>🥇 Gold (XAU/USD) News</h2>
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div class="widget-content">
+                        <div class="news-feed" id="goldNews">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DXY News Widget -->
+                <div class="widget news-widget">
+                    <div class="widget-header">
+                        <h2>💵 DXY (Dollar Index) News</h2>
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div class="widget-content">
+                        <div class="news-feed" id="dxyNews">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Overview Widget -->
+                <div class="widget market-widget">
+                    <div class="widget-header">
+                        <h2>📊 Market Overview</h2>
+                    </div>
+                    <div class="widget-content">
+                        <div class="market-stats" id="marketStats">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Correlations Page -->
+        <div class="page" id="correlations">
+            <div class="correlations-container">
+                <div class="section-header">
+                    <h1>🔥 Master Intermarket Correlation Map</h1>
+                    <p class="subtitle">Using U.S. Dollar Index (DXY) as base driver</p>
+                </div>
+
+                <!-- Correlation Cards -->
+                <div class="correlation-grid">
+                    <!-- Gold -->
+                    <div class="correlation-card negative">
+                        <div class="card-header">
+                            <h3>🥇 GOLD (XAU/USD)</h3>
+                            <span class="correlation-badge negative">Strong Negative</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bearish">Gold Bearish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bullish">Gold Bullish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                <strong>Reason:</strong> Gold is priced in USD. Strong dollar reduces demand globally.
+                            </div>
+                            <div class="exception">
+                                <strong>⚠ Exception:</strong> Crisis risk → Gold can rise even if DXY rises.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- EUR/USD -->
+                    <div class="correlation-card negative">
+                        <div class="card-header">
+                            <h3>💶 EUR/USD</h3>
+                            <span class="correlation-badge negative">Strong Negative</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bearish">EUR/USD Bearish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bullish">EUR/USD Bullish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                <strong>Reason:</strong> EUR = ~57% of DXY weight. This is almost mechanical.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- GBP/USD -->
+                    <div class="correlation-card negative">
+                        <div class="card-header">
+                            <h3>💷 GBP/USD</h3>
+                            <span class="correlation-badge negative">Strong Negative</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bearish">GBP/USD Bearish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bullish">GBP/USD Bullish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                Slightly weaker than EUR but structurally inverse.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AUD/USD -->
+                    <div class="correlation-card negative risk-sensitive">
+                        <div class="card-header">
+                            <h3>🇦🇺 AUD/USD</h3>
+                            <span class="correlation-badge negative">Negative (Risk Sensitive)</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bearish">AUD/USD Bearish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bullish">AUD/USD Bullish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                <strong>BUT:</strong> AUD also depends on:
+                                <ul>
+                                    <li>China growth</li>
+                                    <li>Risk sentiment</li>
+                                    <li>Commodities</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NZD/USD -->
+                    <div class="correlation-card negative">
+                        <div class="card-header">
+                            <h3>🇳🇿 NZD/USD</h3>
+                            <span class="correlation-badge negative">Negative</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bearish">NZD/USD Bearish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bullish">NZD/USD Bullish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                Similar behavior to AUD but more volatile.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- USD/JPY -->
+                    <div class="correlation-card positive">
+                        <div class="card-header">
+                            <h3>🇯🇵 USD/JPY</h3>
+                            <span class="correlation-badge positive">Positive</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bullish">USD/JPY Bullish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bearish">USD/JPY Bearish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                <strong>Reason:</strong> USD is base currency.
+                            </div>
+                            <div class="exception">
+                                <strong>⚠ Exception:</strong> During risk-off, JPY strengthens regardless of DXY.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- USD/CAD -->
+                    <div class="correlation-card positive">
+                        <div class="card-header">
+                            <h3>🇨🇦 USD/CAD</h3>
+                            <span class="correlation-badge positive">Positive</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bullish">USD/CAD Bullish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bearish">USD/CAD Bearish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                <strong>BUT:</strong> Oil matters heavily.<br>
+                                If oil rallies hard → CAD strengthens → USD/CAD falls even if DXY slightly bullish.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- USD/CHF -->
+                    <div class="correlation-card positive">
+                        <div class="card-header">
+                            <h3>🇨🇭 USD/CHF</h3>
+                            <span class="correlation-badge positive">Positive</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="correlation-info">
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bullish">DXY Bullish →</span>
+                                    <span class="scenario-result bullish">USD/CHF Bullish</span>
+                                </div>
+                                <div class="correlation-scenario">
+                                    <span class="scenario-label bearish">DXY Bearish →</span>
+                                    <span class="scenario-result bearish">USD/CHF Bearish</span>
+                                </div>
+                            </div>
+                            <div class="reason">
+                                CHF behaves like JPY during fear events.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Table -->
+                <div class="summary-section">
+                    <h2>📊 Structured Summary Table</h2>
+                    <div class="summary-table-wrapper">
+                        <table class="summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>Correlation vs DXY</th>
+                                    <th>Reaction if DXY Bullish</th>
+                                    <th>Reaction if DXY Bearish</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Gold (XAU/USD)</strong></td>
+                                    <td><span class="badge negative">Strong Negative</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>EUR/USD</strong></td>
+                                    <td><span class="badge negative">Strong Negative</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>GBP/USD</strong></td>
+                                    <td><span class="badge negative">Strong Negative</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>AUD/USD</strong></td>
+                                    <td><span class="badge negative">Negative</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NZD/USD</strong></td>
+                                    <td><span class="badge negative">Negative</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>USD/JPY</strong></td>
+                                    <td><span class="badge positive">Positive</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>USD/CAD</strong></td>
+                                    <td><span class="badge positive">Positive</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>USD/CHF</strong></td>
+                                    <td><span class="badge positive">Positive</span></td>
+                                    <td><span class="badge bullish">Bullish</span></td>
+                                    <td><span class="badge bearish">Bearish</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Correlation Strength Rankings -->
+                <div class="rankings-section">
+                    <div class="ranking-column">
+                        <h3>⚠ Correlation Strength Ranking</h3>
+                        <div class="ranking-list">
+                            <h4>Strongest Inverse:</h4>
+                            <ol>
+                                <li>EUR/USD</li>
+                                <li>Gold</li>
+                                <li>GBP/USD</li>
+                                <li>AUD/USD</li>
+                                <li>NZD/USD</li>
+                            </ol>
+                            <h4>Strongest Positive:</h4>
+                            <ol>
+                                <li>USD/JPY</li>
+                                <li>USD/CHF</li>
+                                <li>USD/CAD</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="warning-box">
+                        <h3>🧠 What Most Traders Get Wrong</h3>
+                        <p><strong>Correlation ≠ causation.</strong></p>
+                        <p>DXY doesn't "cause" moves. Macro expectations (rates, inflation, growth) drive both. DXY is just a reflection.</p>
+                        <p>If you blindly trade "DXY down → buy gold" without:</p>
+                        <ul>
+                            <li>Yield context</li>
+                            <li>News context</li>
+                            <li>Session liquidity</li>
+                        </ul>
+                        <p class="warning-text">You will lose money.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Psychology Page -->
+        <div class="page" id="psychology">
+            <div class="psychology-container">
+                <div class="section-header">
+                    <h1>🧠 Trading Psychology & Risk Management</h1>
+                    <p class="subtitle">Wisdom from the world's best traders</p>
+                </div>
+
+                <div class="psychology-grid" id="psychologyGrid">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- DXY Engine Page -->
+        <div class="page" id="dxy-engine">
+            <div class="engine-container">
+                <div class="section-header">
+                    <h1>🔥 Auto DXY Bias Detection Engine</h1>
+                    <p class="subtitle">Real-time macro alignment analysis</p>
+                </div>
+
+                <!-- Level 1: DXY Bias -->
+                <div class="engine-section">
+                    <h2>Level 1 — Auto DXY Bias Detection</h2>
+                    <div class="bias-display" id="dxyBiasDisplay">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Level 2: Asset Projection -->
+                <div class="engine-section">
+                    <h2>Level 2 — Auto Asset Bias Projection</h2>
+                    <div class="projection-table-wrapper">
+                        <table class="projection-table" id="assetProjection">
+                            <!-- Populated by JavaScript -->
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Level 3: Full Intermarket Engine -->
+                <div class="engine-section">
+                    <h2>Level 3 — Full Intermarket Engine</h2>
+                    <p class="engine-description">Adding 4 macro drivers: DXY + US 10Y Yields + Oil + Risk Sentiment</p>
+                    
+                    <div class="macro-drivers" id="macroDrivers">
+                        <!-- Populated by JavaScript -->
+                    </div>
+
+                    <div class="final-output" id="finalEngineOutput">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Warning Section -->
+                <div class="warning-section">
+                    <h3>⚠ Where This Fails</h3>
+                    <p>Let me challenge you.</p>
+                    <p>If CPI prints far above forecast:</p>
+                    <ul>
+                        <li>DXY spikes</li>
+                        <li>Yields spike</li>
+                        <li>Gold dumps</li>
+                    </ul>
+                    <p><strong>But if market expected even worse?</strong> Gold may reverse.</p>
+                    <p class="highlight">Your engine must factor surprise vs expectation, not just direction.</p>
+                </div>
+
+                <div class="challenge-box">
+                    <h3>🚨 Now Here's the Hard Question</h3>
+                    <p>You trade gold heavily. Do you actually check:</p>
+                    <ul>
+                        <li>✓ US 10Y real yields?</li>
+                        <li>✓ Correlation breakdown days?</li>
+                        <li>✓ Pre-NFP compression?</li>
+                        <li>✓ Liquidity void zones?</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
