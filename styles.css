@@ -2829,3 +2829,20 @@ body {
 .yields-floating-widget {
     animation: slideInRight 0.5s ease-out;
 }
+
+/* ===== US Yields in Header ===== */
+.yields-card {
+    background: rgba(0, 255, 136, 0.05) !important;
+    border: 1px solid rgba(0, 255, 136, 0.2) !important;
+}
+
+.yields-card:hover {
+    border-color: rgba(0, 255, 136, 0.4) !important;
+    box-shadow: 0 4px 12px rgba(0, 255, 136, 0.15) !important;
+}
+
+.yields-value {
+    color: #00ff88 !important;
+    font-family: 'Space Mono', monospace !important;
+    font-weight: 700 !important;
+}

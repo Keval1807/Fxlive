@@ -166,6 +166,33 @@
                         <span class="status-value" id="trumpCount">0</span>
                     </div>
                 </div>
+                <div class="status-card yields-card">
+                    <div class="status-icon-wrap">
+                        <div class="status-icon">📊</div>
+                    </div>
+                    <div class="status-info">
+                        <span class="status-label">US 2Y Yield</span>
+                        <span class="status-value yields-value" id="yield2y">-</span>
+                    </div>
+                </div>
+                <div class="status-card yields-card">
+                    <div class="status-icon-wrap">
+                        <div class="status-icon">📈</div>
+                    </div>
+                    <div class="status-info">
+                        <span class="status-label">US 10Y Yield</span>
+                        <span class="status-value yields-value" id="yield10y">-</span>
+                    </div>
+                </div>
+                <div class="status-card yields-card">
+                    <div class="status-icon-wrap">
+                        <div class="status-icon">📊</div>
+                    </div>
+                    <div class="status-info">
+                        <span class="status-label">US 30Y Yield</span>
+                        <span class="status-value yields-value" id="yield30y">-</span>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -489,29 +516,6 @@
                 <div class="toast-message"></div>
             </div>
             <button class="toast-close" onclick="closeToast()">×</button>
-        </div>
-
-        <!-- US Yields Floating Widget -->
-        <div class="yields-floating-widget" id="yieldsWidget">
-            <div class="yields-widget-header" onclick="toggleYieldsWidget()">
-                <span class="yields-title">📊 US Yields</span>
-                <span class="yields-toggle" id="yieldsToggle">▼</span>
-            </div>
-            <div class="yields-widget-body" id="yieldsWidgetBody">
-                <div class="yield-mini-item">
-                    <span class="yield-mini-label">2Y</span>
-                    <span class="yield-mini-value" id="yield2y">-</span>
-                </div>
-                <div class="yield-mini-item">
-                    <span class="yield-mini-label">10Y</span>
-                    <span class="yield-mini-value" id="yield10y">-</span>
-                </div>
-                <div class="yield-mini-item">
-                    <span class="yield-mini-label">30Y</span>
-                    <span class="yield-mini-value" id="yield30y">-</span>
-                </div>
-                <div class="yields-update-time" id="yieldsUpdateTime">Updated: --:--</div>
-            </div>
         </div>
     </div>
 
