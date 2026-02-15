@@ -1204,14 +1204,6 @@ function renderNewsCard(article) {
         ${sentimentHTML}
         <div class="news-tags">${tagsHTML}</div>
         <div class="news-card-actions">
-            <button class="btn-ai-analysis" onclick="showAIAnalysis(${state.newsCache.indexOf(article)})">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                </svg>
-                AI Analysis
-            </button>
             <a href="${article.url}" target="_blank" class="read-more">Read Full Article</a>
         </div>
     `;
@@ -2076,6 +2068,13 @@ function showMarketHours() {
         timeZone: 'UTC'
     });
     
+    // Helper function to format hours
+    function formatHour(hour) {
+        const h = Math.floor(hour);
+        const m = Math.floor((hour - h) * 60);
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    }
+    
     container.innerHTML = `
         <div class="current-time-display">
             <div class="time-card">
@@ -2146,12 +2145,6 @@ function showMarketHours() {
             </div>
         </div>
     `;
-    
-    function formatHour(hour) {
-        const h = Math.floor(hour);
-        const m = Math.floor((hour - h) * 60);
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    }
     
     modal.classList.add('active');
     
