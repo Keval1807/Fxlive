@@ -3152,3 +3152,18 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* ===== Individual Currency Sentiment Badges ===== */
+.sentiment-item .sentiment-pair {
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.sentiment-item.neutral {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sentiment-item.neutral .sentiment-direction {
+    color: rgba(255, 255, 255, 0.7);
+}
