@@ -2447,6 +2447,329 @@ function closeMarketHours() {
     }
 }
 
+// ===== Candlestick Patterns Modal =====
+function showCandlestickPatterns() {
+    const modal = document.getElementById('patternsModal');
+    const container = document.getElementById('patternsContainer');
+    
+    if (!modal || !container) return;
+    
+    const patterns = {
+        single: [
+            {
+                name: 'Hammer',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="5" x2="20" y2="20" stroke="#00ff88" stroke-width="2"/><rect x="14" y="20" width="12" height="15" fill="#00ff88" rx="1"/><line x1="20" y1="35" x2="20" y2="75" stroke="#00ff88" stroke-width="2"/></svg>',
+                description: 'Small body at top, long lower wick. Found at bottom of downtrend. Signals reversal.'
+            },
+            {
+                name: 'Inverted Hammer',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="5" x2="20" y2="45" stroke="#00ff88" stroke-width="2"/><rect x="14" y="45" width="12" height="15" fill="#00ff88" rx="1"/><line x1="20" y1="60" x2="20" y2="70" stroke="#00ff88" stroke-width="2"/></svg>',
+                description: 'Small body at bottom, long upper wick. Found at bottom of downtrend.'
+            },
+            {
+                name: 'Bullish Spinning Top',
+                type: 'Neutral',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="10" x2="20" y2="30" stroke="#00ff88" stroke-width="2"/><rect x="15" y="30" width="10" height="10" fill="#00ff88" rx="1"/><line x1="20" y1="40" x2="20" y2="70" stroke="#00ff88" stroke-width="2"/></svg>',
+                description: 'Small body with equal wicks. Indicates indecision in the market.'
+            },
+            {
+                name: 'Bullish Marubozu',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><rect x="12" y="15" width="16" height="50" fill="#00ff88" rx="1"/></svg>',
+                description: 'Large body, no wicks. Strong bullish momentum, buyers in control.'
+            },
+            {
+                name: 'Doji',
+                type: 'Neutral',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="10" x2="20" y2="35" stroke="#ffffff" stroke-width="2"/><rect x="18" y="35" width="4" height="4" fill="#ffffff"/><line x1="20" y1="39" x2="20" y2="70" stroke="#ffffff" stroke-width="2"/></svg>',
+                description: 'Open equals close. Market indecision, potential reversal signal.'
+            },
+            {
+                name: 'Shooting Star',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="5" x2="20" y2="45" stroke="#ff4d6a" stroke-width="2"/><rect x="14" y="45" width="12" height="15" fill="#ff4d6a" rx="1"/><line x1="20" y1="60" x2="20" y2="70" stroke="#ff4d6a" stroke-width="2"/></svg>',
+                description: 'Small body at bottom, long upper wick. Found at top of uptrend.'
+            },
+            {
+                name: 'Hanging Man',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="5" x2="20" y2="20" stroke="#ff4d6a" stroke-width="2"/><rect x="14" y="20" width="12" height="15" fill="#ff4d6a" rx="1"/><line x1="20" y1="35" x2="20" y2="75" stroke="#ff4d6a" stroke-width="2"/></svg>',
+                description: 'Small body at top, long lower wick. Found at top of uptrend. Signals reversal.'
+            },
+            {
+                name: 'Bearish Spinning Top',
+                type: 'Neutral',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><line x1="20" y1="10" x2="20" y2="30" stroke="#ff4d6a" stroke-width="2"/><rect x="15" y="30" width="10" height="10" fill="#ff4d6a" rx="1"/><line x1="20" y1="40" x2="20" y2="70" stroke="#ff4d6a" stroke-width="2"/></svg>',
+                description: 'Small body with equal wicks. Indicates indecision in the market.'
+            },
+            {
+                name: 'Bearish Marubozu',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 40 80" class="candle-svg"><rect x="12" y="15" width="16" height="50" fill="#ff4d6a" rx="1"/></svg>',
+                description: 'Large body, no wicks. Strong bearish momentum, sellers in control.'
+            }
+        ],
+        double: [
+            {
+                name: 'Bullish Engulfing',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><rect x="15" y="25" width="10" height="30" fill="#ff4d6a" rx="1"/><rect x="40" y="15" width="16" height="50" fill="#00ff88" rx="1"/></svg>',
+                description: 'Small red candle followed by larger green candle that engulfs it. Strong reversal.'
+            },
+            {
+                name: 'Bullish Harami',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><rect x="12" y="15" width="16" height="50" fill="#ff4d6a" rx="1"/><rect x="42" y="30" width="10" height="20" fill="#00ff88" rx="1"/></svg>',
+                description: 'Large red candle followed by small green candle inside its body.'
+            },
+            {
+                name: 'Piercing Line',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><rect x="15" y="15" width="12" height="40" fill="#ff4d6a" rx="1"/><line x1="46" y1="55" x2="46" y2="65" stroke="#00ff88" stroke-width="2"/><rect x="40" y="30" width="12" height="25" fill="#00ff88" rx="1"/></svg>',
+                description: 'Red candle followed by green that opens lower but closes above midpoint.'
+            },
+            {
+                name: 'Tweezer Bottom',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><line x1="20" y1="15" x2="20" y2="30" stroke="#ff4d6a" stroke-width="2"/><rect x="14" y="30" width="12" height="25" fill="#ff4d6a" rx="1"/><line x1="20" y1="55" x2="20" y2="65" stroke="#ff4d6a" stroke-width="2"/><line x1="46" y1="15" x2="46" y2="30" stroke="#00ff88" stroke-width="2"/><rect x="40" y="30" width="12" height="25" fill="#00ff88" rx="1"/><line x1="46" y1="55" x2="46" y2="65" stroke="#00ff88" stroke-width="2"/></svg>',
+                description: 'Two candles with matching lows. Strong support level confirmed.'
+            },
+            {
+                name: 'Bearish Engulfing',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><rect x="15" y="25" width="10" height="30" fill="#00ff88" rx="1"/><rect x="40" y="15" width="16" height="50" fill="#ff4d6a" rx="1"/></svg>',
+                description: 'Small green candle followed by larger red candle that engulfs it.'
+            },
+            {
+                name: 'Bearish Harami',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><rect x="12" y="15" width="16" height="50" fill="#00ff88" rx="1"/><rect x="42" y="30" width="10" height="20" fill="#ff4d6a" rx="1"/></svg>',
+                description: 'Large green candle followed by small red candle inside its body.'
+            },
+            {
+                name: 'Dark Cloud Cover',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><line x1="20" y1="45" x2="20" y2="55" stroke="#00ff88" stroke-width="2"/><rect x="14" y="25" width="12" height="20" fill="#00ff88" rx="1"/><rect x="40" y="15" width="12" height="40" fill="#ff4d6a" rx="1"/><line x1="46" y1="55" x2="46" y2="65" stroke="#ff4d6a" stroke-width="2"/></svg>',
+                description: 'Green candle followed by red that opens higher but closes below midpoint.'
+            },
+            {
+                name: 'Tweezer Top',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 80 80" class="candle-svg"><line x1="20" y1="15" x2="20" y2="25" stroke="#00ff88" stroke-width="2"/><rect x="14" y="25" width="12" height="25" fill="#00ff88" rx="1"/><line x1="20" y1="50" x2="20" y2="65" stroke="#00ff88" stroke-width="2"/><line x1="46" y1="15" x2="46" y2="25" stroke="#ff4d6a" stroke-width="2"/><rect x="40" y="25" width="12" height="25" fill="#ff4d6a" rx="1"/><line x1="46" y1="50" x2="46" y2="65" stroke="#ff4d6a" stroke-width="2"/></svg>',
+                description: 'Two candles with matching highs. Strong resistance level confirmed.'
+            }
+        ],
+        triple: [
+            {
+                name: 'Morning Star',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 120 80" class="candle-svg"><rect x="8" y="15" width="14" height="45" fill="#ff4d6a" rx="1"/><line x1="46" y1="35" x2="46" y2="45" stroke="#ffffff" stroke-width="2"/><rect x="44" y="45" width="4" height="4" fill="#ffffff"/><line x1="46" y1="49" x2="46" y2="60" stroke="#ffffff" stroke-width="2"/><rect x="72" y="20" width="14" height="45" fill="#00ff88" rx="1"/></svg>',
+                description: 'Long red, small doji, long green. Strong bullish reversal at bottom.'
+            },
+            {
+                name: 'Three White Soldiers',
+                type: 'Bullish',
+                svg: '<svg viewBox="0 0 120 80" class="candle-svg"><rect x="8" y="35" width="12" height="35" fill="#00ff88" rx="1"/><rect x="42" y="25" width="12" height="35" fill="#00ff88" rx="1"/><rect x="76" y="15" width="12" height="35" fill="#00ff88" rx="1"/></svg>',
+                description: 'Three consecutive green candles with higher closes. Strong uptrend.'
+            },
+            {
+                name: 'Evening Star',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 120 80" class="candle-svg"><rect x="8" y="20" width="14" height="45" fill="#00ff88" rx="1"/><line x1="46" y1="30" x2="46" y2="40" stroke="#ffffff" stroke-width="2"/><rect x="44" y="40" width="4" height="4" fill="#ffffff"/><line x1="46" y1="44" x2="46" y2="55" stroke="#ffffff" stroke-width="2"/><rect x="72" y="25" width="14" height="45" fill="#ff4d6a" rx="1"/></svg>',
+                description: 'Long green, small doji, long red. Strong bearish reversal at top.'
+            },
+            {
+                name: 'Three Black Crows',
+                type: 'Bearish',
+                svg: '<svg viewBox="0 0 120 80" class="candle-svg"><rect x="8" y="15" width="12" height="35" fill="#ff4d6a" rx="1"/><rect x="42" y="25" width="12" height="35" fill="#ff4d6a" rx="1"/><rect x="76" y="35" width="12" height="35" fill="#ff4d6a" rx="1"/></svg>',
+                description: 'Three consecutive red candles with lower closes. Strong downtrend.'
+            }
+        ]
+    };
+    
+    container.innerHTML = `
+        <!-- Candlestick Anatomy -->
+        <div class="pattern-section">
+            <h3 class="pattern-section-title">📖 Candlestick Anatomy</h3>
+            <div class="anatomy-grid">
+                <div class="anatomy-card bullish">
+                    <h4>Bullish Candle (Green)</h4>
+                    <svg viewBox="0 0 80 120" class="anatomy-svg">
+                        <!-- Upper Wick -->
+                        <line x1="40" y1="10" x2="40" y2="30" stroke="#00ff88" stroke-width="3"/>
+                        <text x="50" y="20" fill="#00ff88" font-size="10">Upper Wick</text>
+                        
+                        <!-- Body -->
+                        <rect x="25" y="30" width="30" height="50" fill="#00ff88" rx="2"/>
+                        <text x="60" y="40" fill="#00ff88" font-size="10">Close</text>
+                        <text x="60" y="55" fill="#00ff88" font-size="10">Real</text>
+                        <text x="60" y="65" fill="#00ff88" font-size="10">Body</text>
+                        <text x="60" y="75" fill="#00ff88" font-size="10">Open</text>
+                        
+                        <!-- Lower Wick -->
+                        <line x1="40" y1="80" x2="40" y2="110" stroke="#00ff88" stroke-width="3"/>
+                        <text x="50" y="100" fill="#00ff88" font-size="10">Lower Wick</text>
+                        
+                        <!-- High/Low markers -->
+                        <text x="5" y="15" fill="#00ff88" font-size="12" font-weight="bold">High</text>
+                        <text x="5" y="115" fill="#00ff88" font-size="12" font-weight="bold">Low</text>
+                    </svg>
+                    <p class="anatomy-desc">Price opened at bottom, closed at top. Buyers in control.</p>
+                </div>
+                <div class="anatomy-card bearish">
+                    <h4>Bearish Candle (Red)</h4>
+                    <svg viewBox="0 0 80 120" class="anatomy-svg">
+                        <!-- Upper Wick -->
+                        <line x1="40" y1="10" x2="40" y2="30" stroke="#ff4d6a" stroke-width="3"/>
+                        <text x="50" y="20" fill="#ff4d6a" font-size="10">Upper Wick</text>
+                        
+                        <!-- Body -->
+                        <rect x="25" y="30" width="30" height="50" fill="#ff4d6a" rx="2"/>
+                        <text x="60" y="40" fill="#ff4d6a" font-size="10">Open</text>
+                        <text x="60" y="55" fill="#ff4d6a" font-size="10">Real</text>
+                        <text x="60" y="65" fill="#ff4d6a" font-size="10">Body</text>
+                        <text x="60" y="75" fill="#ff4d6a" font-size="10">Close</text>
+                        
+                        <!-- Lower Wick -->
+                        <line x1="40" y1="80" x2="40" y2="110" stroke="#ff4d6a" stroke-width="3"/>
+                        <text x="50" y="100" fill="#ff4d6a" font-size="10">Lower Wick</text>
+                        
+                        <!-- High/Low markers -->
+                        <text x="5" y="15" fill="#ff4d6a" font-size="12" font-weight="bold">High</text>
+                        <text x="5" y="115" fill="#ff4d6a" font-size="12" font-weight="bold">Low</text>
+                    </svg>
+                    <p class="anatomy-desc">Price opened at top, closed at bottom. Sellers in control.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Single Candlestick Patterns -->
+        <div class="pattern-section">
+            <h3 class="pattern-section-title">📍 Single Candlestick Patterns</h3>
+            <div class="patterns-grid">
+                ${patterns.single.map(p => `
+                    <div class="pattern-card ${p.type.toLowerCase()}">
+                        <div class="pattern-visual">${p.svg}</div>
+                        <div class="pattern-info">
+                            <h4 class="pattern-name">${p.name}</h4>
+                            <span class="pattern-badge ${p.type.toLowerCase()}">${p.type}</span>
+                            <p class="pattern-desc">${p.description}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <!-- Double Candlestick Patterns -->
+        <div class="pattern-section">
+            <h3 class="pattern-section-title">📊 Double Candlestick Patterns</h3>
+            <div class="patterns-grid">
+                ${patterns.double.map(p => `
+                    <div class="pattern-card ${p.type.toLowerCase()}">
+                        <div class="pattern-visual">${p.svg}</div>
+                        <div class="pattern-info">
+                            <h4 class="pattern-name">${p.name}</h4>
+                            <span class="pattern-badge ${p.type.toLowerCase()}">${p.type}</span>
+                            <p class="pattern-desc">${p.description}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <!-- Triple Candlestick Patterns -->
+        <div class="pattern-section">
+            <h3 class="pattern-section-title">📈 Triple Candlestick Patterns</h3>
+            <div class="patterns-grid">
+                ${patterns.triple.map(p => `
+                    <div class="pattern-card ${p.type.toLowerCase()}">
+                        <div class="pattern-visual">${p.svg}</div>
+                        <div class="pattern-info">
+                            <h4 class="pattern-name">${p.name}</h4>
+                            <span class="pattern-badge ${p.type.toLowerCase()}">${p.type}</span>
+                            <p class="pattern-desc">${p.description}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <!-- Quick Reference -->
+        <div class="pattern-section">
+            <h3 class="pattern-section-title">⚡ Quick Reference Guide</h3>
+            <div class="reference-grid">
+                <div class="reference-card bullish-ref">
+                    <h4>🟢 Bullish Patterns</h4>
+                    <ul>
+                        <li><strong>Reversal:</strong> Hammer, Inverted Hammer, Morning Star, Bullish Engulfing</li>
+                        <li><strong>Continuation:</strong> Three White Soldiers, Bullish Marubozu</li>
+                        <li><strong>Where to Look:</strong> Bottom of downtrends, support levels</li>
+                        <li><strong>Confirmation:</strong> Wait for next candle to confirm direction</li>
+                    </ul>
+                </div>
+                <div class="reference-card bearish-ref">
+                    <h4>🔴 Bearish Patterns</h4>
+                    <ul>
+                        <li><strong>Reversal:</strong> Shooting Star, Hanging Man, Evening Star, Bearish Engulfing</li>
+                        <li><strong>Continuation:</strong> Three Black Crows, Bearish Marubozu</li>
+                        <li><strong>Where to Look:</strong> Top of uptrends, resistance levels</li>
+                        <li><strong>Confirmation:</strong> Wait for next candle to confirm direction</li>
+                    </ul>
+                </div>
+                <div class="reference-card neutral-ref">
+                    <h4>⚪ Neutral Patterns (Indecision)</h4>
+                    <ul>
+                        <li><strong>Patterns:</strong> Doji, Spinning Tops</li>
+                        <li><strong>Meaning:</strong> Market indecision, buyers and sellers balanced</li>
+                        <li><strong>What to Do:</strong> Wait for confirmation before trading</li>
+                        <li><strong>Context Matters:</strong> Can signal reversal at extremes</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Trading Tips -->
+        <div class="pattern-tips">
+            <h4>💡 Pro Trading Tips</h4>
+            <div class="tips-grid">
+                <div class="tip-item">
+                    <span class="tip-icon">1️⃣</span>
+                    <strong>Always Confirm:</strong> Never trade on a single candle. Wait for the next candle to confirm the pattern.
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">2️⃣</span>
+                    <strong>Volume Matters:</strong> Patterns are more reliable with high volume. Low volume = weak signal.
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">3️⃣</span>
+                    <strong>Context is Key:</strong> Look at the bigger picture. Where in the trend is the pattern forming?
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">4️⃣</span>
+                    <strong>Combine with Support/Resistance:</strong> Patterns at key levels are much more powerful.
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">5️⃣</span>
+                    <strong>Risk Management:</strong> Always use stop losses. Even the best patterns can fail.
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">6️⃣</span>
+                    <strong>Practice:</strong> Study historical charts to recognize patterns in real-time.
+                </div>
+            </div>
+        </div>
+    `;
+    
+    modal.classList.add('active');
+}
+
+function closeCandlestickPatterns() {
+    const modal = document.getElementById('patternsModal');
+    if (modal) modal.classList.remove('active');
+}
+
 // ===== US Yields Widget =====
 async function updateYieldsWidget() {
     try {
@@ -2519,6 +2842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             closeCorrelations();
             closePsychology();
             closeMarketHours();
+            closeCandlestickPatterns();
         }
     });
     
