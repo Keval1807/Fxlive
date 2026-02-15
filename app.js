@@ -1328,41 +1328,14 @@ function renderNewsCard(article) {
         // FALLBACK: If no currency sentiment, do basic keyword analysis
         const text = (article.title + ' ' + article.description).toLowerCase();
         
-        // Check for dollar mentions
-        if (text.includes('dollar') || text.includes('usd') || text.includes('greenback')) {
-            if (text.includes('strengthens') || text.includes('gains') || text.includes('rises') || text.includes('rallies') || text.includes('higher') || text.includes('up')) {
-                correlationAnalysis.push({
-                    pair: 'DXY',
-                    sentiment: 'Bullish',
-                    reason: 'USD Strength Mentioned'
-                });
-                correlationAnalysis.push({
-                    pair: 'GOLD',
-                    sentiment: 'Bearish',
-                    reason: 'Strong USD → Gold Pressure'
-                });
-                // Add major pairs
-                correlationAnalysis.push({
-                    pair: 'EUR/USD',
-                    sentiment: 'Bearish',
-                    reason: 'USD Strength'
-                });
-                correlationAnalysis.push({
-                    pair: 'GBP/USD',
-                    sentiment: 'Bearish',
-                    reason: 'USD Strength'
-                });
-                correlationAnalysis.push({
-                    pair: 'USD/JPY',
-                    sentiment: 'Bullish',
-                    reason: 'USD Strength'
-                });
-                correlationAnalysis.push({
-                    pair: 'AUD/USD',
-                    sentiment: 'Bearish',
-                    reason: 'USD Strength'
-                });
-            } else if (text.includes('weakens') || text.includes('falls') || text.includes('declines') || text.includes('drops') || text.includes('lower') || text.includes('down')) {
+        // Check for dollar mentions - FIXED LOGIC
+        if (text.includes('dollar') || text.includes('usd') || text.includes('greenback') || text.includes('dxy')) {
+            // BEARISH USD keywords
+            if (text.includes('struggle') || text.includes('struggles') || text.includes('lost ground') || 
+                text.includes('weakens') || text.includes('falls') || text.includes('declines') || 
+                text.includes('drops') || text.includes('lower') || text.includes('down') ||
+                text.includes('soften') || text.includes('retreat') || text.includes('under pressure') ||
+                text.includes('slips') || text.includes('tumbles') || text.includes('plunge')) {
                 correlationAnalysis.push({
                     pair: 'DXY',
                     sentiment: 'Bearish',
@@ -1373,7 +1346,6 @@ function renderNewsCard(article) {
                     sentiment: 'Bullish',
                     reason: 'Weak USD → Gold Support'
                 });
-                // Add major pairs
                 correlationAnalysis.push({
                     pair: 'EUR/USD',
                     sentiment: 'Bullish',
@@ -1384,67 +1356,73 @@ function renderNewsCard(article) {
                     sentiment: 'Bullish',
                     reason: 'USD Weakness'
                 });
+            } 
+            // BULLISH USD keywords
+            else if (text.includes('strengthens') || text.includes('gains') || text.includes('rises') || 
+                     text.includes('rallies') || text.includes('higher') || text.includes('up') ||
+                     text.includes('surge') || text.includes('advance') || text.includes('climb')) {
                 correlationAnalysis.push({
-                    pair: 'USD/JPY',
-                    sentiment: 'Bearish',
-                    reason: 'USD Weakness'
+                    pair: 'DXY',
+                    sentiment: 'Bullish',
+                    reason: 'USD Strength Mentioned'
                 });
                 correlationAnalysis.push({
-                    pair: 'AUD/USD',
-                    sentiment: 'Bullish',
-                    reason: 'USD Weakness'
+                    pair: 'GOLD',
+                    sentiment: 'Bearish',
+                    reason: 'Strong USD → Gold Pressure'
+                });
+                correlationAnalysis.push({
+                    pair: 'EUR/USD',
+                    sentiment: 'Bearish',
+                    reason: 'USD Strength'
+                });
+                correlationAnalysis.push({
+                    pair: 'GBP/USD',
+                    sentiment: 'Bearish',
+                    reason: 'USD Strength'
                 });
             }
         }
         
-        // Check for EUR mentions
-        if (text.includes('euro') || text.includes('eur')) {
-            if (text.includes('strengthens') || text.includes('gains') || text.includes('rises') || text.includes('rallies')) {
-                correlationAnalysis.push({
-                    pair: 'EUR/USD',
-                    sentiment: 'Bullish',
-                    reason: 'EUR Strength Mentioned'
-                });
-            } else if (text.includes('weakens') || text.includes('falls') || text.includes('declines')) {
-                correlationAnalysis.push({
-                    pair: 'EUR/USD',
-                    sentiment: 'Bearish',
-                    reason: 'EUR Weakness Mentioned'
-                });
-            }
-        }
-        
-        // Check for GBP mentions
-        if (text.includes('pound') || text.includes('gbp') || text.includes('sterling')) {
-            if (text.includes('strengthens') || text.includes('gains') || text.includes('rises') || text.includes('rallies')) {
-                correlationAnalysis.push({
-                    pair: 'GBP/USD',
-                    sentiment: 'Bullish',
-                    reason: 'GBP Strength Mentioned'
-                });
-            } else if (text.includes('weakens') || text.includes('falls') || text.includes('declines')) {
-                correlationAnalysis.push({
-                    pair: 'GBP/USD',
-                    sentiment: 'Bearish',
-                    reason: 'GBP Weakness Mentioned'
-                });
+        // Check for specific pair mentions - ONLY add if mentioned
+        if (text.includes('eur/usd') || text.includes('eurusd') || (text.includes('euro') && text.includes('dollar'))) {
+            if (text.includes('rise') || text.includes('gain') || text.includes('rally') || text.includes('higher')) {
+                if (!correlationAnalysis.some(item => item.pair === 'EUR/USD')) {
+                    correlationAnalysis.push({
+                        pair: 'EUR/USD',
+                        sentiment: 'Bullish',
+                        reason: 'EUR/USD Strength Mentioned'
+                    });
+                }
+            } else if (text.includes('fall') || text.includes('decline') || text.includes('drop') || text.includes('lower')) {
+                if (!correlationAnalysis.some(item => item.pair === 'EUR/USD')) {
+                    correlationAnalysis.push({
+                        pair: 'EUR/USD',
+                        sentiment: 'Bearish',
+                        reason: 'EUR/USD Weakness Mentioned'
+                    });
+                }
             }
         }
         
         // Check for gold mentions
         if (text.includes('gold') || text.includes('xau')) {
-            if (text.includes('rises') || text.includes('gains') || text.includes('rallies') || text.includes('higher')) {
-                correlationAnalysis.push({
-                    pair: 'GOLD',
-                    sentiment: 'Bullish',
-                    reason: 'Gold Strength Mentioned'
-                });
-            } else if (text.includes('falls') || text.includes('declines') || text.includes('drops') || text.includes('lower')) {
-                correlationAnalysis.push({
-                    pair: 'GOLD',
-                    sentiment: 'Bearish',
-                    reason: 'Gold Weakness Mentioned'
-                });
+            if (text.includes('rise') || text.includes('gain') || text.includes('rally') || text.includes('higher') || text.includes('surge')) {
+                if (!correlationAnalysis.some(item => item.pair === 'GOLD')) {
+                    correlationAnalysis.push({
+                        pair: 'GOLD',
+                        sentiment: 'Bullish',
+                        reason: 'Gold Strength Mentioned'
+                    });
+                }
+            } else if (text.includes('fall') || text.includes('decline') || text.includes('drop') || text.includes('lower') || text.includes('plunge')) {
+                if (!correlationAnalysis.some(item => item.pair === 'GOLD')) {
+                    correlationAnalysis.push({
+                        pair: 'GOLD',
+                        sentiment: 'Bearish',
+                        reason: 'Gold Weakness Mentioned'
+                    });
+                }
             }
         }
     }
