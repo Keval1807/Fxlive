@@ -1,15 +1,5 @@
 // ===== Configuration =====
 const CONFIG = {
-    // Google Gemini API Configuration
-    GEMINI_API_KEY: 'YOUR_GEMINI_API_KEY_HERE', // Replace with your actual API key from https://makersuite.google.com/app/apikey
-    GEMINI_API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
-    GEMINI_VISION_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent',
-    
-    // AI Settings
-    USE_ADVANCED_AI: true,
-    CONVERSATION_HISTORY: true,
-    MAX_HISTORY_LENGTH: 10,
-    
     RSS_FEEDS: [
         // Forex News Feeds
         { name: 'FXStreet', url: 'https://www.fxstreet.com/rss/news', category: 'forex', type: 'forex' },
@@ -60,115 +50,6 @@ const CONFIG = {
     }
 };
 
-// ===== Google Gemini API Helper =====
-async function callGeminiAPI(prompt, useHistory = true) {
-    if (CONFIG.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-        console.warn('⚠️ Gemini API key not configured. Using fallback analysis.');
-        throw new Error('API key not configured');
-    }
-    
-    try {
-        // Build conversation with history for context
-        const contents = [];
-        
-        if (useHistory && CONFIG.CONVERSATION_HISTORY && state.conversationHistory.length > 0) {
-            // Add previous conversation turns
-            state.conversationHistory.forEach(turn => {
-                contents.push({
-                    role: turn.role,
-                    parts: [{ text: turn.text }]
-                });
-            });
-        }
-        
-        // Add current prompt
-        contents.push({
-            role: 'user',
-            parts: [{ text: prompt }]
-        });
-        
-        console.log('🤖 Calling Gemini API with', contents.length, 'conversation turns');
-        
-        const response = await fetch(`${CONFIG.GEMINI_API_URL}?key=${CONFIG.GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: contents,
-                generationConfig: {
-                    temperature: 0.9,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 2048,
-                },
-                safetySettings: [
-                    {
-                        category: "HARM_CATEGORY_HARASSMENT",
-                        threshold: "BLOCK_NONE"
-                    },
-                    {
-                        category: "HARM_CATEGORY_HATE_SPEECH",
-                        threshold: "BLOCK_NONE"
-                    },
-                    {
-                        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                        threshold: "BLOCK_NONE"
-                    },
-                    {
-                        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                        threshold: "BLOCK_NONE"
-                    }
-                ]
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('❌ Gemini API Error Response:', errorData);
-            throw new Error(`Gemini API error: ${response.status} - ${JSON.stringify(errorData)}`);
-        }
-
-        const data = await response.json();
-        console.log('✅ Gemini API Response:', data);
-        
-        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-            const aiText = data.candidates[0].content.parts[0].text;
-            
-            // Store in conversation history
-            if (useHistory && CONFIG.CONVERSATION_HISTORY) {
-                state.conversationHistory.push({
-                    role: 'user',
-                    text: prompt
-                });
-                state.conversationHistory.push({
-                    role: 'model',
-                    text: aiText
-                });
-                
-                // Keep only recent history
-                if (state.conversationHistory.length > CONFIG.MAX_HISTORY_LENGTH * 2) {
-                    state.conversationHistory = state.conversationHistory.slice(-CONFIG.MAX_HISTORY_LENGTH * 2);
-                }
-            }
-            
-            return aiText;
-        }
-        
-        throw new Error('Invalid response structure from Gemini API');
-        
-    } catch (error) {
-        console.error('❌ Gemini API Error:', error);
-        throw error;
-    }
-}
-
-// Clear conversation history
-function clearConversationHistory() {
-    state.conversationHistory = [];
-    console.log('🗑️ Conversation history cleared');
-}
-
 // ===== State Management =====
 let state = {
     newsCache: [],
@@ -185,9 +66,7 @@ let state = {
     lastArticleCount: 0,
     currentChart: null,
     currentChartSymbol: 'EURUSD',
-    pushSubscription: null,
-    conversationHistory: [], // Store AI conversation context
-    currentArticleAnalysis: null // Store current article being analyzed
+    pushSubscription: null
 };
 
 // ===== Advanced Sentiment Analysis Engine =====
@@ -584,10 +463,10 @@ IMPORTANT INSTRUCTIONS:
 - Return ONLY valid JSON, no markdown formatting, no code blocks
 - Make sure all quotes are properly escaped in JSON`;
 
-            console.log('Calling Gemini API with prompt...');
+            console.log('AI Analysis disabled - using fallback');
             
-            // Call Gemini API
-            const aiResponse = await callGeminiAPI(prompt);
+            // Skip AI API call - throw to use fallback
+            throw new Error('AI features disabled');
             
             console.log('Gemini API Response:', aiResponse);
             
@@ -886,53 +765,23 @@ IMPORTANT INSTRUCTIONS:
             };
         });
         
-        // Get AI-powered market overview
-        try {
-            const currencyData = Object.entries(summary.currencies).map(([curr, data]) => 
-                `${curr}: ${data.sentiment} (Strength: ${data.strength}%, Articles: ${data.articleCount})`
-            ).join('\n');
-            
-            const recentNews = articles.slice(0, 5).map(a => a.title).join('\n');
-            
-            const prompt = `You are a professional forex market analyst. Based on the current market data, provide a brief professional overview.
-
-Currency Sentiment Data:
-${currencyData}
-
-Recent Major News:
-${recentNews}
-
-Provide a 2-3 sentence professional market overview focusing on:
-1. Main market themes
-2. Key trading opportunities
-3. Risk factors to watch
-
-Keep it concise and actionable for traders. Respond with ONLY the overview text, no additional formatting.`;
-
-            const aiOverview = await callGeminiAPI(prompt);
-            summary.overview = aiOverview.trim();
-            
-        } catch (error) {
-            console.error('AI Overview Error:', error);
-            
-            // Fallback overview
-            const strongCurrencies = Object.entries(summary.currencies)
-                .filter(([_, data]) => data.sentiment === 'Bullish')
-                .map(([currency]) => currency);
-            
-            const weakCurrencies = Object.entries(summary.currencies)
-                .filter(([_, data]) => data.sentiment === 'Bearish')
-                .map(([currency]) => currency);
-            
-            if (strongCurrencies.length > 0 && weakCurrencies.length > 0) {
-                summary.overview = `FX markets show clear divergence with ${strongCurrencies.join(', ')} strengthening while ${weakCurrencies.join(', ')} face pressure. This creates high-conviction trading opportunities.`;
-            } else if (strongCurrencies.length > 0) {
-                summary.overview = `Risk-on sentiment dominates with ${strongCurrencies.join(', ')} leading gains. Market lacks clear bearish catalysts.`;
-            } else if (weakCurrencies.length > 0) {
-                summary.overview = `Risk-off conditions prevail with ${weakCurrencies.join(', ')} under pressure. Defensive positioning recommended.`;
-            } else {
-                summary.overview = `FX markets are cautious amid mixed economic data and geopolitical tensions, with currencies trading in tight ranges.`;
-            }
+        // Use fallback overview (AI disabled)
+        const strongCurrencies = Object.entries(summary.currencies)
+            .filter(([_, data]) => data.sentiment === 'Bullish')
+            .map(([currency]) => currency);
+        
+        const weakCurrencies = Object.entries(summary.currencies)
+            .filter(([_, data]) => data.sentiment === 'Bearish')
+            .map(([currency]) => currency);
+        
+        if (strongCurrencies.length > 0 && weakCurrencies.length > 0) {
+            summary.overview = `FX markets show clear divergence with ${strongCurrencies.join(', ')} strengthening while ${weakCurrencies.join(', ')} face pressure. This creates high-conviction trading opportunities.`;
+        } else if (strongCurrencies.length > 0) {
+            summary.overview = `Risk-on sentiment dominates with ${strongCurrencies.join(', ')} leading gains. Market lacks clear bearish catalysts.`;
+        } else if (weakCurrencies.length > 0) {
+            summary.overview = `Risk-off conditions prevail with ${weakCurrencies.join(', ')} under pressure. Defensive positioning recommended.`;
+        } else {
+            summary.overview = `FX markets are cautious amid mixed economic data and geopolitical tensions, with currencies trading in tight ranges.`;
         }
         
         return summary;
@@ -1608,259 +1457,6 @@ function initEconomicCalendar() {
     widgetContainer.appendChild(script);
 }
 
-// ===== AI Analysis Modal =====
-async function showAIAnalysis(articleIndex) {
-    const article = state.newsCache[articleIndex];
-    
-    // Show modal first
-    document.getElementById('aiAnalysisModal').classList.add('active');
-    
-    // Get AI analysis
-    const analysis = await MarketIntelligence.generateAIAnalysis(article);
-    
-    const container = document.getElementById('aiAnalysisContainer');
-    
-    let html = `
-        <div class="ai-analysis-header">
-            <h3 class="ai-analysis-title">${article.title}</h3>
-            <p class="ai-analysis-subtitle">${analysis.summary}</p>
-        </div>
-    `;
-    
-    // Fundamental Analysis
-    if (analysis.fundamentalAnalysis) {
-        html += `
-            <div class="analysis-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">📊</div>
-                    <h4 class="analysis-section-title">Fundamental Analysis</h4>
-                </div>
-                <p class="analysis-content">${analysis.fundamentalAnalysis}</p>
-            </div>
-        `;
-    }
-    
-    // Technical Analysis
-    if (analysis.technicalOutlook) {
-        html += `
-            <div class="analysis-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">📈</div>
-                    <h4 class="analysis-section-title">Technical Outlook</h4>
-                </div>
-                <p class="analysis-content">${analysis.technicalOutlook}</p>
-            </div>
-        `;
-    }
-    
-    // Market Context
-    if (analysis.marketContext) {
-        html += `
-            <div class="analysis-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">🌍</div>
-                    <h4 class="analysis-section-title">Market Context</h4>
-                </div>
-                <p class="analysis-content">${analysis.marketContext}</p>
-            </div>
-        `;
-    }
-    
-    // Affected Currencies with Pros & Cons
-    if (analysis.affectedCurrencies && analysis.affectedCurrencies.length > 0) {
-        html += `
-            <div class="analysis-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">💱</div>
-                    <h4 class="analysis-section-title">Affected Currencies - Detailed Analysis</h4>
-                </div>
-                <div class="affected-currencies-grid">
-        `;
-        
-        analysis.affectedCurrencies.forEach(curr => {
-            const impactClass = curr.impact.toLowerCase();
-            const impactIcon = curr.impact === 'Bullish' ? '📈' : curr.impact === 'Bearish' ? '📉' : '➡️';
-            
-            html += `
-                <div class="currency-analysis-card ${impactClass}">
-                    <div class="currency-analysis-header">
-                        <div class="currency-name-large">${CONFIG.CURRENCY_FLAGS[curr.currency] || ''} ${curr.currency}</div>
-                        <div class="currency-impact-badge ${impactClass}">${impactIcon} ${curr.impact}</div>
-                    </div>
-                    
-                    <div class="pros-cons-container">
-                        <div class="pros-section">
-                            <div class="pros-header">✅ Pros (Bullish Factors)</div>
-                            <ul class="pros-list">
-                                ${curr.pros.map(pro => `<li>${pro}</li>`).join('')}
-                            </ul>
-                        </div>
-                        
-                        <div class="cons-section">
-                            <div class="cons-header">⚠️ Cons (Bearish Factors)</div>
-                            <ul class="cons-list">
-                                ${curr.cons.map(con => `<li>${con}</li>`).join('')}
-                            </ul>
-                        </div>
-                    </div>
-                    
-                    <div class="currency-outlook">
-                        <strong>Outlook:</strong> ${curr.outlook}
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += `
-                </div>
-            </div>
-        `;
-    }
-    
-    // Trading Recommendations
-    if (analysis.tradingRecommendations && analysis.tradingRecommendations.length > 0) {
-        html += `
-            <div class="analysis-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">💼</div>
-                    <h4 class="analysis-section-title">Trading Recommendations</h4>
-                </div>
-                <div class="time-horizon-badge ${analysis.confidenceLevel?.toLowerCase() || 'medium'}">
-                    ⏱️ ${analysis.timeHorizon || 'Short-term (1-3 days)'} | 🎯 Confidence: ${analysis.confidenceLevel || 'Medium'}
-                </div>
-                <div class="trading-recommendations-grid">
-        `;
-        
-        analysis.tradingRecommendations.forEach((rec, idx) => {
-            html += `
-                <div class="recommendation-card">
-                    <div class="rec-header">
-                        <span class="rec-number">#${idx + 1}</span>
-                        <span class="rec-setup">${rec.setup}</span>
-                    </div>
-                    <div class="rec-details">
-                        <div class="rec-item">
-                            <span class="rec-label">📍 Entry:</span>
-                            <span class="rec-value">${rec.entry}</span>
-                        </div>
-                        <div class="rec-item">
-                            <span class="rec-label">🛑 Stop Loss:</span>
-                            <span class="rec-value">${rec.stopLoss}</span>
-                        </div>
-                        <div class="rec-item">
-                            <span class="rec-label">🎯 Take Profit:</span>
-                            <span class="rec-value">${rec.takeProfit}</span>
-                        </div>
-                    </div>
-                    <div class="rec-reasoning">
-                        <strong>Reasoning:</strong> ${rec.reasoning}
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += `
-                </div>
-            </div>
-        `;
-    }
-    
-    // Key Levels Section
-    if (analysis.keyLevels) {
-        html += `
-            <div class="analysis-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">🎚️</div>
-                    <h4 class="analysis-section-title">Key Technical Levels</h4>
-                </div>
-                <div class="key-levels-grid">
-                    <div class="levels-column">
-                        <div class="levels-header support">📉 Support Levels</div>
-        `;
-        
-        if (analysis.keyLevels.support) {
-            analysis.keyLevels.support.forEach(level => {
-                html += `<div class="level-item">${level}</div>`;
-            });
-        }
-        
-        html += `
-                    </div>
-                    <div class="levels-column">
-                        <div class="levels-header resistance">📈 Resistance Levels</div>
-        `;
-        
-        if (analysis.keyLevels.resistance) {
-            analysis.keyLevels.resistance.forEach(level => {
-                html += `<div class="level-item">${level}</div>`;
-            });
-        }
-        
-        html += `
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Risk Factors Section
-    if (analysis.riskFactors && analysis.riskFactors.length > 0) {
-        html += `
-            <div class="analysis-section risk-section">
-                <div class="analysis-section-header">
-                    <div class="analysis-icon">⚠️</div>
-                    <h4 class="analysis-section-title">Risk Factors to Monitor</h4>
-                </div>
-                <div class="risk-factors">
-        `;
-        
-        analysis.riskFactors.forEach(risk => {
-            html += `
-                <div class="risk-item">
-                    <span class="risk-bullet">⚠️</span>
-                    ${risk}
-                </div>
-            `;
-        });
-        
-        html += `
-                </div>
-            </div>
-        `;
-    }
-    
-    // Retail Positioning
-    html += `
-        <div class="analysis-section">
-            <div class="analysis-section-header">
-                <div class="analysis-icon">👥</div>
-                <h4 class="analysis-section-title">Retail Positioning Sentiment</h4>
-            </div>
-            <div class="retail-positioning">
-                <div class="positioning-bar-container">
-                    <div class="positioning-bar" style="width: ${analysis.retailPositioning.long}%">
-                        ${analysis.retailPositioning.long}% Long
-                    </div>
-                </div>
-                <div class="positioning-labels">
-                    <span class="positioning-label">Long: ${analysis.retailPositioning.long}%</span>
-                    <span class="positioning-label">Short: ${analysis.retailPositioning.short}%</span>
-                </div>
-            </div>
-            <p class="analysis-content" style="margin-top: 1rem;">
-                ${analysis.retailPositioning.long > 55 ? '⚠️ Retail traders are heavily long, which often indicates potential for downside moves as institutional players may fade this positioning. Consider contrarian strategies.' :
-                  analysis.retailPositioning.long < 45 ? '✅ Retail traders are heavily short, suggesting potential for upside as smart money may be on the long side. This could fuel a short squeeze.' :
-                  '➡️ Retail positioning is balanced, indicating indecision and potential for breakout in either direction. Wait for confirmation.'}
-            </p>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-function closeAIAnalysis() {
-    document.getElementById('aiAnalysisModal').classList.remove('active');
-}
 
 // ===== Stats & Status Updates =====
 function updateStats() {
@@ -2058,46 +1654,6 @@ function getTimeAgo(date) {
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
     return `${Math.floor(seconds / 86400)}d ago`;
-}
-
-// ===== API Key Management =====
-function checkGeminiApiKey() {
-    const storedKey = localStorage.getItem('gemini_api_key');
-    if (storedKey && storedKey !== 'YOUR_GEMINI_API_KEY_HERE') {
-        CONFIG.GEMINI_API_KEY = storedKey;
-        return true;
-    }
-    return false;
-}
-
-function saveGeminiApiKey() {
-    const input = document.getElementById('geminiApiKeyInput');
-    const apiKey = input.value.trim();
-    
-    if (!apiKey) {
-        showToast('Error', 'Please enter a valid API key');
-        return;
-    }
-    
-    // Validate API key format (Gemini keys start with 'AIza')
-    if (!apiKey.startsWith('AIza')) {
-        showToast('Warning', 'This doesn\'t look like a valid Gemini API key. Gemini keys typically start with "AIza"');
-    }
-    
-    localStorage.setItem('gemini_api_key', apiKey);
-    CONFIG.GEMINI_API_KEY = apiKey;
-    
-    document.getElementById('apiKeyModal').classList.remove('active');
-    showToast('Success', 'API key saved! AI features are now enabled.');
-}
-
-function skipApiKeySetup() {
-    document.getElementById('apiKeyModal').classList.remove('active');
-    showToast('AI Disabled', 'You can enable AI features later from Settings');
-}
-
-function showApiKeySetup() {
-    document.getElementById('apiKeyModal').classList.add('active');
 }
 
 // ===== Correlations Modal =====
@@ -2409,6 +1965,214 @@ function closePsychology() {
     if (modal) modal.classList.remove('active');
 }
 
+// ===== Market Hours Modal =====
+function showMarketHours() {
+    const modal = document.getElementById('marketHoursModal');
+    const container = document.getElementById('marketHoursContainer');
+    
+    if (!modal || !container) return;
+    
+    // Get current time
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const utcMinutes = now.getUTCMinutes();
+    const currentTime = utcHours + utcMinutes / 60;
+    
+    // Define market sessions (in UTC)
+    const markets = [
+        {
+            name: 'Sydney',
+            flag: '🇦🇺',
+            open: 22, // 10 PM UTC
+            close: 7,  // 7 AM UTC (next day)
+            timezone: 'AEDT (UTC+11)'
+        },
+        {
+            name: 'Tokyo',
+            flag: '🇯🇵',
+            open: 0, // 12 AM UTC
+            close: 9, // 9 AM UTC
+            timezone: 'JST (UTC+9)'
+        },
+        {
+            name: 'London',
+            flag: '🇬🇧',
+            open: 8, // 8 AM UTC
+            close: 16.5, // 4:30 PM UTC
+            timezone: 'GMT (UTC+0)'
+        },
+        {
+            name: 'New York',
+            flag: '🇺🇸',
+            open: 13, // 1 PM UTC
+            close: 22, // 10 PM UTC
+            timezone: 'EST (UTC-5)'
+        }
+    ];
+    
+    // Check if market is open
+    function isMarketOpen(market) {
+        if (market.close > market.open) {
+            // Normal case: open and close on same day
+            return currentTime >= market.open && currentTime < market.close;
+        } else {
+            // Crosses midnight
+            return currentTime >= market.open || currentTime < market.close;
+        }
+    }
+    
+    // Get time until open/close
+    function getTimeStatus(market) {
+        const isOpen = isMarketOpen(market);
+        
+        if (isOpen) {
+            let hoursUntilClose;
+            if (market.close > market.open) {
+                hoursUntilClose = market.close - currentTime;
+            } else {
+                if (currentTime >= market.open) {
+                    hoursUntilClose = (24 - currentTime) + market.close;
+                } else {
+                    hoursUntilClose = market.close - currentTime;
+                }
+            }
+            
+            const hours = Math.floor(hoursUntilClose);
+            const minutes = Math.floor((hoursUntilClose - hours) * 60);
+            return {
+                isOpen: true,
+                status: 'OPEN',
+                time: `Closes in ${hours}h ${minutes}m`
+            };
+        } else {
+            let hoursUntilOpen;
+            if (currentTime < market.open) {
+                hoursUntilOpen = market.open - currentTime;
+            } else {
+                hoursUntilOpen = (24 - currentTime) + market.open;
+            }
+            
+            const hours = Math.floor(hoursUntilOpen);
+            const minutes = Math.floor((hoursUntilOpen - hours) * 60);
+            return {
+                isOpen: false,
+                status: 'CLOSED',
+                time: `Opens in ${hours}h ${minutes}m`
+            };
+        }
+    }
+    
+    // Get current time display
+    const localTime = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+    });
+    
+    const utcTime = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'UTC'
+    });
+    
+    container.innerHTML = `
+        <div class="current-time-display">
+            <div class="time-card">
+                <div class="time-label">Your Local Time</div>
+                <div class="time-value">${localTime}</div>
+            </div>
+            <div class="time-card">
+                <div class="time-label">UTC Time</div>
+                <div class="time-value">${utcTime}</div>
+            </div>
+        </div>
+        
+        <div class="markets-grid">
+            ${markets.map(market => {
+                const status = getTimeStatus(market);
+                return `
+                    <div class="market-card ${status.isOpen ? 'open' : 'closed'}">
+                        <div class="market-header">
+                            <div class="market-title">
+                                <span class="market-flag">${market.flag}</span>
+                                <h3>${market.name}</h3>
+                            </div>
+                            <span class="market-status ${status.isOpen ? 'open' : 'closed'}">${status.status}</span>
+                        </div>
+                        <div class="market-body">
+                            <div class="market-info">
+                                <span class="info-label">Timezone:</span>
+                                <span class="info-value">${market.timezone}</span>
+                            </div>
+                            <div class="market-info">
+                                <span class="info-label">Trading Hours:</span>
+                                <span class="info-value">${formatHour(market.open)} - ${formatHour(market.close)} UTC</span>
+                            </div>
+                            <div class="market-countdown">
+                                ${status.time}
+                            </div>
+                        </div>
+                        <div class="market-progress">
+                            <div class="progress-bar ${status.isOpen ? 'active' : ''}"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        
+        <div class="market-hours-info">
+            <h3>💡 Trading Session Overview</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Sydney Session (22:00-07:00 UTC)</strong>
+                    <p>Starts the trading week. Lower volatility, good for AUD and NZD pairs.</p>
+                </div>
+                <div class="info-item">
+                    <strong>Tokyo Session (00:00-09:00 UTC)</strong>
+                    <p>Asian market hours. Focus on JPY pairs. Moderate volatility.</p>
+                </div>
+                <div class="info-item">
+                    <strong>London Session (08:00-16:30 UTC)</strong>
+                    <p>Highest volume. Major EUR and GBP movements. Overlaps with NY for high volatility.</p>
+                </div>
+                <div class="info-item">
+                    <strong>New York Session (13:00-22:00 UTC)</strong>
+                    <p>USD pairs most active. Major news releases. Overlap with London creates peak liquidity.</p>
+                </div>
+            </div>
+            <div class="peak-hours">
+                <strong>🔥 Peak Trading Hours:</strong> London/NY Overlap (13:00-16:30 UTC) - Highest liquidity and volatility
+            </div>
+        </div>
+    `;
+    
+    function formatHour(hour) {
+        const h = Math.floor(hour);
+        const m = Math.floor((hour - h) * 60);
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    }
+    
+    modal.classList.add('active');
+    
+    // Update every minute
+    if (window.marketHoursInterval) clearInterval(window.marketHoursInterval);
+    window.marketHoursInterval = setInterval(() => {
+        if (modal.classList.contains('active')) {
+            showMarketHours();
+        }
+    }, 60000);
+}
+
+function closeMarketHours() {
+    const modal = document.getElementById('marketHoursModal');
+    if (modal) modal.classList.remove('active');
+    if (window.marketHoursInterval) {
+        clearInterval(window.marketHoursInterval);
+        window.marketHoursInterval = null;
+    }
+}
+
 // ===== Real-time Update Loop =====
 function startRealTimeUpdates() {
     // Auto-refresh news
@@ -2424,14 +2188,6 @@ function startRealTimeUpdates() {
 
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', () => {
-    // Check for Gemini API key
-    if (!checkGeminiApiKey()) {
-        // Show API key setup modal after a brief delay
-        setTimeout(() => {
-            showApiKeySetup();
-        }, 1000);
-    }
-    
     loadAllNews();
     startRealTimeUpdates();
     
@@ -2440,16 +2196,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.classList.contains('modal-backdrop')) {
             closeCalendar();
             closeMarketSummary();
-            closeAIAnalysis();
             closeCharts();
             closeTrumpTracker();
             closeCorrelations();
             closePsychology();
+            closeMarketHours();
         }
     });
     
     console.log('ForexLive Intelligence with Real-time Features initialized successfully');
-    console.log('🧠 AI Powered by: Google Gemini');
     console.log('🦅 Trump Tracker: Enabled');
     console.log('📊 TradingView Charts: Enabled');
     console.log('📈 Currency Strength Meter: Enabled');
