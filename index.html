@@ -490,6 +490,29 @@
             </div>
             <button class="toast-close" onclick="closeToast()">×</button>
         </div>
+
+        <!-- US Yields Floating Widget -->
+        <div class="yields-floating-widget" id="yieldsWidget">
+            <div class="yields-widget-header" onclick="toggleYieldsWidget()">
+                <span class="yields-title">📊 US Yields</span>
+                <span class="yields-toggle" id="yieldsToggle">▼</span>
+            </div>
+            <div class="yields-widget-body" id="yieldsWidgetBody">
+                <div class="yield-mini-item">
+                    <span class="yield-mini-label">2Y</span>
+                    <span class="yield-mini-value" id="yield2y">-</span>
+                </div>
+                <div class="yield-mini-item">
+                    <span class="yield-mini-label">10Y</span>
+                    <span class="yield-mini-value" id="yield10y">-</span>
+                </div>
+                <div class="yield-mini-item">
+                    <span class="yield-mini-label">30Y</span>
+                    <span class="yield-mini-value" id="yield30y">-</span>
+                </div>
+                <div class="yields-update-time" id="yieldsUpdateTime">Updated: --:--</div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

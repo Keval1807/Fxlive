@@ -1189,6 +1189,140 @@ function renderNewsCard(article) {
     
     const timeAgo = getTimeAgo(new Date(article.publishedAt));
     
+    // Enhanced Correlation-Based Sentiment Analysis
+    let correlationSentimentHTML = '';
+    if (article.currencySentiment && Object.keys(article.currencySentiment).length > 0) {
+        const bullishCurrencies = [];
+        const bearishCurrencies = [];
+        
+        Object.entries(article.currencySentiment).forEach(([currency, sentiment]) => {
+            if (sentiment === 'Bullish') {
+                bullishCurrencies.push(currency);
+            } else if (sentiment === 'Bearish') {
+                bearishCurrencies.push(currency);
+            }
+        });
+        
+        // Apply correlation logic
+        const correlationAnalysis = [];
+        
+        // If USD is bullish/bearish, show correlated pairs
+        if (article.currencySentiment['USD']) {
+            const usdSentiment = article.currencySentiment['USD'];
+            if (usdSentiment === 'Bullish') {
+                correlationAnalysis.push({
+                    pair: 'DXY',
+                    sentiment: 'Bullish',
+                    reason: 'USD Strength'
+                });
+                correlationAnalysis.push({
+                    pair: 'GOLD',
+                    sentiment: 'Bearish',
+                    reason: 'Strong USD (Negative Correlation)'
+                });
+            } else if (usdSentiment === 'Bearish') {
+                correlationAnalysis.push({
+                    pair: 'DXY',
+                    sentiment: 'Bearish',
+                    reason: 'USD Weakness'
+                });
+                correlationAnalysis.push({
+                    pair: 'GOLD',
+                    sentiment: 'Bullish',
+                    reason: 'Weak USD (Negative Correlation)'
+                });
+            }
+        }
+        
+        // Add gold sentiment if available
+        if (article.goldSentiment) {
+            correlationAnalysis.push({
+                pair: 'XAU/USD',
+                sentiment: article.goldSentiment,
+                reason: 'Direct Gold News'
+            });
+        }
+        
+        // Generate pairs sentiment based on currencies detected
+        const pairs = [
+            { pair: 'EUR/USD', base: 'EUR', quote: 'USD' },
+            { pair: 'GBP/USD', base: 'GBP', quote: 'USD' },
+            { pair: 'USD/JPY', base: 'USD', quote: 'JPY' },
+            { pair: 'AUD/USD', base: 'AUD', quote: 'USD' },
+            { pair: 'USD/CAD', base: 'USD', quote: 'CAD' },
+            { pair: 'USD/CHF', base: 'USD', quote: 'CHF' },
+            { pair: 'NZD/USD', base: 'NZD', quote: 'USD' }
+        ];
+        
+        pairs.forEach(({pair, base, quote}) => {
+            const baseSentiment = article.currencySentiment[base];
+            const quoteSentiment = article.currencySentiment[quote];
+            
+            if (baseSentiment && quoteSentiment) {
+                if (baseSentiment === 'Bullish' && quoteSentiment === 'Bearish') {
+                    correlationAnalysis.push({
+                        pair: pair,
+                        sentiment: 'Bullish',
+                        reason: `${base} Strong / ${quote} Weak`
+                    });
+                } else if (baseSentiment === 'Bearish' && quoteSentiment === 'Bullish') {
+                    correlationAnalysis.push({
+                        pair: pair,
+                        sentiment: 'Bearish',
+                        reason: `${base} Weak / ${quote} Strong`
+                    });
+                }
+            } else if (baseSentiment && !quoteSentiment) {
+                if (baseSentiment === 'Bullish') {
+                    correlationAnalysis.push({
+                        pair: pair,
+                        sentiment: 'Bullish',
+                        reason: `${base} Strength`
+                    });
+                } else if (baseSentiment === 'Bearish') {
+                    correlationAnalysis.push({
+                        pair: pair,
+                        sentiment: 'Bearish',
+                        reason: `${base} Weakness`
+                    });
+                }
+            } else if (!baseSentiment && quoteSentiment) {
+                if (quoteSentiment === 'Bullish') {
+                    correlationAnalysis.push({
+                        pair: pair,
+                        sentiment: 'Bearish',
+                        reason: `${quote} Strength`
+                    });
+                } else if (quoteSentiment === 'Bearish') {
+                    correlationAnalysis.push({
+                        pair: pair,
+                        sentiment: 'Bullish',
+                        reason: `${quote} Weakness`
+                    });
+                }
+            }
+        });
+        
+        if (correlationAnalysis.length > 0) {
+            correlationSentimentHTML = `
+                <div class="correlation-sentiment-section">
+                    <div class="sentiment-header">📊 Market Impact Analysis</div>
+                    <div class="sentiment-grid">
+                        ${correlationAnalysis.map(item => `
+                            <div class="sentiment-item ${item.sentiment.toLowerCase()}">
+                                <div class="sentiment-pair">${item.pair}</div>
+                                <div class="sentiment-direction ${item.sentiment.toLowerCase()}">
+                                    ${item.sentiment === 'Bullish' ? '📈' : '📉'} ${item.sentiment}
+                                </div>
+                                <div class="sentiment-reason">${item.reason}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
     card.innerHTML = `
         <div class="news-header">
             <span class="${sourceClass}">${article.source}</span>
@@ -1202,6 +1336,7 @@ function renderNewsCard(article) {
         ${centralBankHTML}
         ${trumpBadgeHTML}
         ${sentimentHTML}
+        ${correlationSentimentHTML}
         <div class="news-tags">${tagsHTML}</div>
         <div class="news-card-actions">
             <a href="${article.url}" target="_blank" class="read-more">Read Full Article</a>
@@ -2166,6 +2301,55 @@ function closeMarketHours() {
     }
 }
 
+// ===== US Yields Floating Widget =====
+function toggleYieldsWidget() {
+    const body = document.getElementById('yieldsWidgetBody');
+    const toggle = document.getElementById('yieldsToggle');
+    
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        toggle.textContent = '▼';
+    } else {
+        body.style.display = 'none';
+        toggle.textContent = '▶';
+    }
+}
+
+async function updateYieldsWidget() {
+    try {
+        // Simulated yield data (in production, fetch from Treasury.gov or financial API)
+        // These values would come from a real API
+        const yields = {
+            '2y': (4.25 + (Math.random() * 0.1 - 0.05)).toFixed(2),
+            '10y': (4.48 + (Math.random() * 0.1 - 0.05)).toFixed(2),
+            '30y': (4.65 + (Math.random() * 0.1 - 0.05)).toFixed(2)
+        };
+        
+        // Update display
+        document.getElementById('yield2y').textContent = yields['2y'] + '%';
+        document.getElementById('yield10y').textContent = yields['10y'] + '%';
+        document.getElementById('yield30y').textContent = yields['30y'] + '%';
+        
+        // Update time
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit'
+        });
+        document.getElementById('yieldsUpdateTime').textContent = `Updated: ${timeString}`;
+        
+    } catch (error) {
+        console.error('Error updating yields:', error);
+    }
+}
+
+// Initialize yields widget on load
+function initializeYieldsWidget() {
+    updateYieldsWidget();
+    // Update every 30 seconds
+    setInterval(updateYieldsWidget, 30000);
+}
+
 // ===== Real-time Update Loop =====
 function startRealTimeUpdates() {
     // Auto-refresh news
@@ -2183,6 +2367,7 @@ function startRealTimeUpdates() {
 document.addEventListener('DOMContentLoaded', () => {
     loadAllNews();
     startRealTimeUpdates();
+    initializeYieldsWidget();
     
     // Close modals on backdrop click
     window.addEventListener('click', (e) => {
