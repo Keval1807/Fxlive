@@ -3167,3 +3167,53 @@ body {
 .sentiment-item.neutral .sentiment-direction {
     color: rgba(255, 255, 255, 0.7);
 }
+
+/* ===== Compact Currency Badges Row ===== */
+.correlation-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 8px 0;
+}
+
+.currency-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.currency-badge.bullish {
+    background: rgba(0, 255, 136, 0.12);
+    color: #00ff88;
+    border-color: rgba(0, 255, 136, 0.35);
+}
+
+.currency-badge.bullish:hover {
+    background: rgba(0, 255, 136, 0.22);
+    border-color: rgba(0, 255, 136, 0.6);
+}
+
+.currency-badge.bearish {
+    background: rgba(255, 77, 106, 0.12);
+    color: #ff4d6a;
+    border-color: rgba(255, 77, 106, 0.35);
+}
+
+.currency-badge.bearish:hover {
+    background: rgba(255, 77, 106, 0.22);
+    border-color: rgba(255, 77, 106, 0.6);
+}
+
+.currency-badge.neutral {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.65);
+    border-color: rgba(255, 255, 255, 0.15);
+}

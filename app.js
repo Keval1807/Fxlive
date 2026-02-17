@@ -1466,22 +1466,15 @@ function renderNewsCard(article) {
         });
     }
     
-    // Generate HTML if we have any analysis
+    // Generate HTML - compact inline badges like news terminal
     if (correlationAnalysis.length > 0) {
         correlationSentimentHTML = `
-            <div class="correlation-sentiment-section">
-                <div class="sentiment-header">📊 Market Impact Analysis</div>
-                <div class="sentiment-grid">
-                    ${correlationAnalysis.map(item => `
-                        <div class="sentiment-item ${item.sentiment.toLowerCase()}">
-                            <div class="sentiment-pair">${item.pair}</div>
-                            <div class="sentiment-direction ${item.sentiment.toLowerCase()}">
-                                ${item.sentiment === 'Bullish' ? '📈' : '📉'} ${item.sentiment}
-                            </div>
-                            <div class="sentiment-reason">${item.reason}</div>
-                        </div>
-                    `).join('')}
-                </div>
+            <div class="correlation-badges-row">
+                ${correlationAnalysis.map(item => {
+                    const icon = item.sentiment === 'Bullish' ? '↑' : item.sentiment === 'Bearish' ? '↓' : '→';
+                    const cls = item.sentiment.toLowerCase();
+                    return `<span class="currency-badge ${cls}">${icon} ${item.pair}</span>`;
+                }).join('')}
             </div>
         `;
     }
