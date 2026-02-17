@@ -1189,110 +1189,177 @@ function renderNewsCard(article) {
     
     const timeAgo = getTimeAgo(new Date(article.publishedAt));
     
-    // ===== PRIMARY PAIR SENTIMENT ENGINE =====
+    // ===== SCORE-BASED RELATIONAL SENTIMENT ENGINE =====
+    // Architecture: score each currency independently → derive pair direction relationally
+    // Pair Direction = Base Score − Quote Score (never assigned independently)
     let correlationSentimentHTML = '';
     const text = (article.title + ' ' + (article.description || '')).toLowerCase();
-    
+
+    // ── STEP 1: Score each currency numerically ───────────────
+    // +1 = Bullish, 0 = Neutral, -1 = Bearish
+    // Each currency scored only against its own relevant signals
+    const scores = {};
+
+    function scoreText(signals) {
+        let score = 0;
+        signals.bullish.forEach(w => { if (text.includes(w)) score += 1; });
+        signals.bearish.forEach(w => { if (text.includes(w)) score -= 1; });
+        return score;
+    }
+
+    // USD signals
+    if (/dollar|usd|greenback|dxy|fed|fomc|powell|us cpi|us inflation|us gdp|nonfarm|nfp|us jobs|treasury yield/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['rate hike','hawkish','tightening','hot cpi','above forecast','strong jobs','strong nfp','payrolls beat','unemployment falls','dollar strengthens','dollar gains','dollar rallies','dollar surges','dxy rises','yields climb','yields spike','above expectation','better than expected'],
+            bearish: ['rate cut','dovish','easing','pivot','soft cpi','below forecast','weak jobs','weak nfp','payrolls miss','unemployment rises','dollar weakens','dollar falls','dollar drops','dollar struggles','dxy drops','yields fall','below expectation','worse than expected','recession']
+        });
+        scores['USD'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // EUR signals
+    if (/euro|eur|ecb|lagarde|eurozone|euro area|german|germany/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['ecb hike','ecb raises','ecb hawkish','inflation persistent','euro strengthens','euro gains','euro rallies','euro rises','euro surges','eurozone growth','above forecast','beat expectations'],
+            bearish: ['ecb cut','ecb easing','ecb dovish','euro weakens','euro falls','euro drops','euro declines','eurozone recession','below forecast','miss expectations','euro struggles']
+        });
+        scores['EUR'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // GBP signals
+    if (/pound|gbp|sterling|boe|bank of england|bailey|uk gdp|uk cpi|uk inflation|uk jobs/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['boe hike','boe raises','boe hawkish','pound strengthens','pound gains','pound rallies','sterling rises','uk growth','uk beat','above forecast','wage growth uk'],
+            bearish: ['boe cut','boe easing','boe dovish','pound weakens','pound falls','sterling drops','uk recession','uk contraction','below forecast','pound struggles','uk miss']
+        });
+        scores['GBP'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // JPY signals
+    if (/yen|jpy|boj|bank of japan|ueda|japan gdp|japan cpi|carry trade|yield curve/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['boj hike','boj tighten','boj hawkish','yen strengthens','yen gains','yen rallies','carry unwind','safe haven','japan growth','yields surge japan'],
+            bearish: ['boj cut','boj ease','boj dovish','ultra loose','weak yen','yen falls','yen drops','yen weakens','yen pressure','boj keeps rates']
+        });
+        scores['JPY'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // AUD signals
+    if (/aussie|aud|rba|reserve bank of australia|australia|australian dollar/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['rba hike','rba raises','rba hawkish','aud strengthens','aud gains','aud rallies','australian employment rises','unemployment falls australia','above forecast australia','strong australia'],
+            bearish: ['rba cut','rba easing','rba dovish','aud weakens','aud falls','aud drops','australian recession','below forecast australia','weak australia','aud struggles']
+        });
+        scores['AUD'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // CAD signals (oil is the dominant driver)
+    if (/cad|loonie|canadian dollar|boc|bank of canada|oil|crude|wti|brent|opec/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['oil surge','oil rally','oil rises','oil higher','crude rises','opec cut','supply disruption','cad strengthens','loonie gains','canada growth','boc hike','boc hawkish'],
+            bearish: ['oil falls','oil drops','oil lower','crude falls','opec hike supply','cad weakens','loonie falls','canada recession','boc cut','boc dovish','canada weak']
+        });
+        scores['CAD'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // CHF signals
+    if (/chf|franc|snb|swiss national bank|switzerland/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['chf strengthens','franc gains','franc rallies','safe haven chf','snb hike','snb hawkish','chf rises'],
+            bearish: ['chf weakens','franc falls','chf drops','franc declines','snb cut','snb easing','chf pressure']
+        });
+        scores['CHF'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // NZD signals
+    if (/nzd|kiwi|rbnz|reserve bank of new zealand|new zealand/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['rbnz hike','rbnz hawkish','nzd strengthens','nzd gains','kiwi rallies','new zealand growth','above forecast nz'],
+            bearish: ['rbnz cut','rbnz dovish','nzd weakens','nzd falls','kiwi drops','new zealand recession','below forecast nz']
+        });
+        scores['NZD'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // XAU (Gold) — not a currency, scored directly
+    if (/gold|xau|bullion/i.test(text)) {
+        const raw = scoreText({
+            bullish: ['gold rises','gold gains','gold rallies','gold surges','gold climbs','gold hits record','gold higher','xau rises','bullion rallies'],
+            bearish: ['gold falls','gold drops','gold declines','gold tumbles','gold lower','gold under pressure','xau drops','bullion falls']
+        });
+        scores['XAU'] = raw > 0 ? 1 : raw < 0 ? -1 : 0;
+    }
+
+    // ── STEP 2: Calculate pair direction relationally ─────────
+    // Direction = Base Score − Quote Score
+    // Never assigned independently — mathematically consistent
+    function pairDirection(base, quote) {
+        const b = scores[base] !== undefined ? scores[base] : 0;
+        const q = scores[quote] !== undefined ? scores[quote] : 0;
+        const diff = b - q;
+        if (diff > 0) return { dir: 'Bullish', icon: '↑' };
+        if (diff < 0) return { dir: 'Bearish', icon: '↓' };
+        return null; // Neutral = don't show
+    }
+
+    // ── STEP 3: Determine which pair to show based on article focus ───
     let primaryPair = null;
-    let pairSentiment = null;
+    let pairResult = null;
     let pairReason = '';
 
-    // Helper: determine bullish/bearish bias from text
-    function detectBias(t) {
-        const bullishWords = /rate hike|hawkish|tightening|beat|beats|above forecast|above expectation|strengthens|rallies|rises|gains|surges|climbs|advances|stronger|robust|expansion|hot cpi|inflation surges|strong jobs|strong nfp|strong gdp|employment rises|unemployment falls|wage growth|oil surge|yields climb|yields spike|better.than.expected|solid growth|accelerate|above consensus/i;
-        const bearishWords = /rate cut|dovish|easing|pivot|miss|misses|below forecast|below expectation|weakens|falls|drops|declines|tumbles|slips|struggles|weaker|contraction|recession|slowing|soft cpi|inflation cools|disinflation|weak jobs|weak nfp|weak gdp|employment falls|unemployment rises|wage slowdown|yields fall|yields drop|worse.than.expected|disappoints|below consensus|economy contracts|layoffs/i;
-        const isBull = bullishWords.test(t);
-        const isBear = bearishWords.test(t);
-        if (isBull && !isBear) return 'Bullish';
-        if (isBear && !isBull) return 'Bearish';
-        if (isBull && isBear) {
-            const bc = (t.match(/hike|hawkish|beat|rises|surge|gains|stronger|growth/gi)||[]).length;
-            const dc = (t.match(/cut|dovish|miss|falls|drop|weaker|recession|contraction/gi)||[]).length;
-            return bc >= dc ? 'Bullish' : 'Bearish';
-        }
-        return null;
+    // Detect article focus and pick the correct pair
+    if (/ecb|european central bank|lagarde|eurozone|euro area|eur\/usd|eurusd/i.test(text) && scores['EUR'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('EUR', 'USD');
+        if (pairResult) { primaryPair = 'EUR/USD'; pairReason = pairResult.dir === 'Bullish' ? 'EUR outperforms USD' : 'USD outperforms EUR'; }
+    }
+    else if (/bank of england|boe|bailey|uk gdp|uk cpi|sterling|gbp\/usd|gbpusd/i.test(text) && scores['GBP'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('GBP', 'USD');
+        if (pairResult) { primaryPair = 'GBP/USD'; pairReason = pairResult.dir === 'Bullish' ? 'GBP outperforms USD' : 'USD outperforms GBP'; }
+    }
+    else if (/bank of japan|boj|ueda|japanese yen|yen |jpy|usd\/jpy|usdjpy|carry trade/i.test(text) && scores['JPY'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('USD', 'JPY');
+        if (pairResult) { primaryPair = 'USD/JPY'; pairReason = pairResult.dir === 'Bullish' ? 'USD outperforms JPY' : 'JPY outperforms USD'; }
+    }
+    else if (/reserve bank of australia|rba|australian dollar|aud\/usd|audusd/i.test(text) && scores['AUD'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('AUD', 'USD');
+        if (pairResult) { primaryPair = 'AUD/USD'; pairReason = pairResult.dir === 'Bullish' ? 'AUD outperforms USD' : 'USD outperforms AUD'; }
+    }
+    else if (/bank of canada|boc|canadian dollar|loonie|usd\/cad|usdcad|oil prices|crude oil|wti|brent|opec/i.test(text) && scores['CAD'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('USD', 'CAD');
+        if (pairResult) { primaryPair = 'USD/CAD'; pairReason = pairResult.dir === 'Bullish' ? 'USD outperforms CAD' : 'CAD outperforms USD (oil/macro)'; }
+    }
+    else if (/rbnz|reserve bank of new zealand|new zealand dollar|nzd\/usd|nzdusd/i.test(text) && scores['NZD'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('NZD', 'USD');
+        if (pairResult) { primaryPair = 'NZD/USD'; pairReason = pairResult.dir === 'Bullish' ? 'NZD outperforms USD' : 'USD outperforms NZD'; }
+    }
+    else if (/swiss national bank|snb|swiss franc|chf|usd\/chf|usdchf/i.test(text) && scores['CHF'] !== undefined) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('USD', 'CHF');
+        if (pairResult) { primaryPair = 'USD/CHF'; pairReason = pairResult.dir === 'Bullish' ? 'USD outperforms CHF' : 'CHF outperforms USD'; }
+    }
+    else if (/federal reserve|fomc|powell|us cpi|us inflation|us gdp|nonfarm payroll|nfp|us jobs|treasury yield|greenback|dxy|dollar index/i.test(text) && scores['USD'] !== undefined) {
+        if (scores['EUR'] === undefined) scores['EUR'] = 0;
+        pairResult = pairDirection('EUR', 'USD');
+        if (pairResult) { primaryPair = 'EUR/USD'; pairReason = pairResult.dir === 'Bullish' ? 'EUR outperforms USD' : 'USD outperforms EUR'; }
+    }
+    else if (/gold price|xau|bullion/i.test(text) && scores['XAU'] !== undefined && scores['XAU'] !== 0) {
+        if (scores['USD'] === undefined) scores['USD'] = 0;
+        pairResult = pairDirection('XAU', 'USD');
+        if (pairResult) { primaryPair = 'XAU/USD'; pairReason = pairResult.dir === 'Bullish' ? 'Gold outperforms USD' : 'USD pressure on Gold'; }
     }
 
-    // 1. ECB / EUR → EUR/USD
-    if (/ecb|european central bank|lagarde|eurozone|euro area/i.test(text) ||
-        /eur\/usd|eurusd|euro strengthens|euro weakens|euro rallies|euro falls/i.test(text)) {
-        const bias = detectBias(text);
-        if (bias) { primaryPair = 'EUR/USD'; pairSentiment = bias; pairReason = bias === 'Bullish' ? 'ECB hawkish / EUR strength' : 'ECB dovish / EUR weakness'; }
-    }
-
-    // 2. BOE / GBP → GBP/USD
-    if (!primaryPair && (/bank of england|boe|bailey|uk gdp|uk cpi|uk inflation|uk jobs/i.test(text) ||
-        /british pound|sterling|gbp\/usd|gbpusd|pound strengthens|pound weakens|pound falls/i.test(text))) {
-        const bias = detectBias(text);
-        if (bias) { primaryPair = 'GBP/USD'; pairSentiment = bias; pairReason = bias === 'Bullish' ? 'BoE hawkish / GBP strength' : 'BoE dovish / GBP weakness'; }
-    }
-
-    // 3. BOJ / JPY → USD/JPY (inverted: JPY strong = pair bearish)
-    if (!primaryPair && (/bank of japan|boj|ueda|japanese yen|yen |jpy/i.test(text) ||
-        /usd\/jpy|usdjpy|carry trade|japan gdp|japan cpi|yield curve control/i.test(text))) {
-        const jpyStrong = /tighten|hike|hawkish|carry unwind|yen strengthens|yen gains|yen rallies|safe haven/i.test(text);
-        const jpyWeak = /ease|cut|dovish|ultra loose|weak yen|yen falls|yen drops/i.test(text);
-        if (jpyStrong) { primaryPair = 'USD/JPY'; pairSentiment = 'Bearish'; pairReason = 'JPY strength / BoJ tightening'; }
-        else if (jpyWeak) { primaryPair = 'USD/JPY'; pairSentiment = 'Bullish'; pairReason = 'JPY weakness / BoJ easing'; }
-        else { const bias = detectBias(text); if (bias) { primaryPair = 'USD/JPY'; pairSentiment = bias; pairReason = 'JPY momentum'; } }
-    }
-
-    // 4. RBA / AUD → AUD/USD
-    if (!primaryPair && (/reserve bank of australia|rba|australian dollar|aud\/usd|audusd/i.test(text) ||
-        /australian employment|australian gdp|australian cpi|rba rate/i.test(text))) {
-        const bias = detectBias(text);
-        if (bias) { primaryPair = 'AUD/USD'; pairSentiment = bias; pairReason = bias === 'Bullish' ? 'RBA hawkish / AUD strength' : 'RBA dovish / AUD weakness'; }
-    }
-
-    // 5. BOC / CAD / OIL → USD/CAD (inverted: CAD strong = pair bearish)
-    if (!primaryPair && (/bank of canada|boc|canadian dollar|loonie|usd\/cad|usdcad/i.test(text) ||
-        /oil prices|crude oil|wti|brent|opec|canada gdp|canada cpi/i.test(text))) {
-        const cadStrong = /oil surge|oil rally|oil rises|oil higher|crude rises|opec cut|supply disruption|cad strengthens|loonie gains/i.test(text);
-        const cadWeak = /oil falls|oil drops|oil lower|crude falls|cad weakens|loonie falls/i.test(text);
-        if (cadStrong) { primaryPair = 'USD/CAD'; pairSentiment = 'Bearish'; pairReason = 'Oil surge / CAD strength'; }
-        else if (cadWeak) { primaryPair = 'USD/CAD'; pairSentiment = 'Bullish'; pairReason = 'Oil drop / CAD weakness'; }
-        else { const bias = detectBias(text); if (bias) { primaryPair = 'USD/CAD'; pairSentiment = bias === 'Bullish' ? 'Bearish' : 'Bullish'; pairReason = 'CAD momentum'; } }
-    }
-
-    // 6. RBNZ / NZD → NZD/USD
-    if (!primaryPair && (/rbnz|reserve bank of new zealand|new zealand dollar|nzd\/usd|nzdusd|nz gdp|nz cpi/i.test(text))) {
-        const bias = detectBias(text);
-        if (bias) { primaryPair = 'NZD/USD'; pairSentiment = bias; pairReason = bias === 'Bullish' ? 'RBNZ hawkish / NZD strength' : 'RBNZ dovish / NZD weakness'; }
-    }
-
-    // 7. SNB / CHF → USD/CHF (inverted: CHF strong = pair bearish)
-    if (!primaryPair && (/swiss national bank|snb|swiss franc|chf|usd\/chf|usdchf|switzerland/i.test(text))) {
-        const chfStrong = /chf strengthens|franc gains|safe haven|chf rises|franc rallies/i.test(text);
-        const chfWeak = /chf weakens|franc falls|chf drops|franc declines/i.test(text);
-        if (chfStrong) { primaryPair = 'USD/CHF'; pairSentiment = 'Bearish'; pairReason = 'CHF safe-haven demand'; }
-        else if (chfWeak) { primaryPair = 'USD/CHF'; pairSentiment = 'Bullish'; pairReason = 'CHF weakness'; }
-        else { const bias = detectBias(text); if (bias) { primaryPair = 'USD/CHF'; pairSentiment = bias === 'Bullish' ? 'Bearish' : 'Bullish'; pairReason = 'CHF momentum'; } }
-    }
-
-    // 8. FED / US DATA → EUR/USD (main USD proxy pair)
-    if (!primaryPair && (/federal reserve|fomc|powell|us cpi|us inflation|us gdp|nonfarm payroll|nfp|us jobs/i.test(text) ||
-        /treasury yield|greenback|dxy|dollar index|dollar strengthens|dollar weakens/i.test(text))) {
-        const bias = detectBias(text);
-        if (bias) { primaryPair = 'EUR/USD'; pairSentiment = bias === 'Bullish' ? 'Bearish' : 'Bullish'; pairReason = bias === 'Bullish' ? 'USD strength / hawkish repricing' : 'USD weakness / dovish repricing'; }
-    }
-
-    // 9. GOLD → XAU/USD
-    if (!primaryPair && /gold price|xau|bullion|gold rises|gold falls|gold rally|gold forecast/i.test(text)) {
-        const goldUp = /gold rises|gold gains|gold rallies|gold surges|gold climbs|gold hits record/i.test(text);
-        const goldDown = /gold falls|gold drops|gold declines|gold tumbles|gold lower/i.test(text);
-        if (goldUp) { primaryPair = 'XAU/USD'; pairSentiment = 'Bullish'; pairReason = 'Gold strength'; }
-        else if (goldDown) { primaryPair = 'XAU/USD'; pairSentiment = 'Bearish'; pairReason = 'Gold weakness'; }
-    }
-
-    // 10. GEOPOLITICAL → DXY ↑ + GOLD ↑ (special dual badge)
+    // Risk-off: DXY + GOLD both rise (exception to normal correlation)
     if (!primaryPair && /geopolit|military strike|sanction|escalat|risk.off|safe.haven demand|middle east conflict/i.test(text)) {
-        correlationSentimentHTML = `<div class="correlation-badges-row"><span class="event-label">Risk-Off</span><span class="currency-badge bullish">DXY ↑</span><span class="currency-badge bullish">GOLD ↑</span></div>`;
+        correlationSentimentHTML = '<div class="correlation-badges-row"><span class="event-label">Risk-Off / Safe-Haven</span><span class="currency-badge bullish">DXY ↑</span><span class="currency-badge bullish">GOLD ↑</span></div>';
     }
 
-    // Build single primary pair badge
-    if (primaryPair && pairSentiment && !correlationSentimentHTML) {
-        const icon = pairSentiment === 'Bullish' ? '↑' : '↓';
-        correlationSentimentHTML = `<div class="correlation-badges-row"><span class="event-label">${pairReason}</span><span class="currency-badge ${pairSentiment.toLowerCase()}">${primaryPair} ${icon}</span></div>`;
+    // ── STEP 4: Build badge from relational result ────────────
+    if (primaryPair && pairResult && !correlationSentimentHTML) {
+        correlationSentimentHTML = `<div class="correlation-badges-row"><span class="event-label">${pairReason}</span><span class="currency-badge ${pairResult.dir.toLowerCase()}">${primaryPair} ${pairResult.icon}</span></div>`;
     }
     card.innerHTML = `
         <div class="news-header">
