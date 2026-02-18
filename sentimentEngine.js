@@ -1,554 +1,250 @@
-// ================================================================
-// INSTITUTIONAL-GRADE MACRO SENTIMENT ENGINE
-// ================================================================
-// Pure modular functions for FX sentiment analysis
-// No DOM manipulation - JSON output only
-// ================================================================
+/*
+  SentimentEngine.js
+  Lightweight, deterministic sentiment + regime engine.
+  - Browser: exposes window.SentimentEngine
+  - Node: module.exports = SentimentEngine
 
-// ──────────────────────────────────────────────────────────────
-// 1. CONFIGURATION & CONSTANTS
-// ──────────────────────────────────────────────────────────────
+  API:
+    SentimentEngine.analyzeSentiment(text)
+    SentimentEngine.extractDrivers(text)
+    SentimentEngine.detectRegime(drivers)
+    SentimentEngine.computeCurrencyScores(drivers, weights)
+    SentimentEngine.detectPrimaryPair(text, scores)
+    SentimentEngine.generatePairMatrix(scores)
+*/
 
-const CURRENCY_UNIVERSE = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'XAU'];
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory();
+  } else {
+    root.SentimentEngine = factory();
+  }
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
 
-const SIGNAL_PATTERNS = {
+  const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
+
+  const PAIRS = [
+    ['EUR/USD', 'EUR', 'USD'],
+    ['GBP/USD', 'GBP', 'USD'],
+    ['USD/JPY', 'USD', 'JPY'],
+    ['AUD/USD', 'AUD', 'USD'],
+    ['NZD/USD', 'NZD', 'USD'],
+    ['USD/CAD', 'USD', 'CAD'],
+    ['USD/CHF', 'USD', 'CHF']
+  ];
+
+  // Keyword sets are intentionally small & deterministic.
+  // This is meant to be a plug-in engine that can be expanded later.
+  const KEYWORDS = {
     monetary: {
-        bullish: [
-            { pattern: /(rate hike|hikes? rates?|rais\w+ (?:interest )?rates?|increas\w+ rates?)/, base: 3, modifiers: true },
-            { pattern: /hawkish/, base: 2, modifiers: true },
-            { pattern: /(policy )?tightening/, base: 2, modifiers: true },
-            { pattern: /restrictive( policy)?/, base: 2, modifiers: true },
-            { pattern: /remov\w+ accommodation/, base: 2, modifiers: true },
-            { pattern: /(move|moving|shift) (?:away from|toward) (?:ultra.?loose|easing)/, base: 2, modifiers: true },
-            { pattern: /(reduced?|reduc\w+|less) (?:expectation|bets?) (?:for |of )?(?:rate )?cuts?/, base: 2, modifiers: true },
-            { pattern: /hawkish repric\w+/, base: 2, modifiers: true }
-        ],
-        bearish: [
-            { pattern: /(rate cut|cuts? rates?|lower\w+ rates?|reduc\w+ rates?)/, base: -3, modifiers: true },
-            { pattern: /dovish/, base: -2, modifiers: true },
-            { pattern: /(policy )?easing/, base: -2, modifiers: true },
-            { pattern: /accommodative/, base: -2, modifiers: true },
-            { pattern: /pivot/, base: -2, modifiers: true },
-            { pattern: /(rate )?pause/, base: -1, modifiers: true },
-            { pattern: /(faster|near-term|increased) (?:rate )?cuts?/, base: -2, modifiers: true },
-            { pattern: /(priced?|pricing) (?:in )?(?:faster |more )?(?:rate )?cuts?/, base: -2, modifiers: true }
-        ]
+      bullish: [
+        'rate hike', 'rates hike', 'raising rates', 'higher rates', 'hawkish', 'tightening',
+        'inflation sticky', 'inflation persistent', 'yields rise', 'bond yields rise'
+      ],
+      bearish: [
+        'rate cut', 'rates cut', 'lowering rates', 'dovish', 'easing', 'stimulus',
+        'quantitative easing', 'qe', 'yields fall', 'bond yields fall'
+      ]
     },
     economic: {
-        bullish: [
-            { pattern: /gdp (?:beat|above|exceed)/, base: 2, modifiers: true },
-            { pattern: /strong (?:growth|expansion|jobs|employment)/, base: 2, modifiers: true },
-            { pattern: /robust (?:growth|expansion)/, base: 2, modifiers: true },
-            { pattern: /(employment|payrolls) (?:rose|rises|surged?|beat|above)/, base: 2, modifiers: true },
-            { pattern: /unemployment (?:fell|falls|drop)/, base: 2, modifiers: true },
-            { pattern: /(far )?above (?:expectation|forecast)/, base: 2, modifiers: true },
-            { pattern: /wage (?:growth|pressures?)/, base: 1, modifiers: true },
-            { pattern: /accelerat\w+/, base: 1, modifiers: true },
-            { pattern: /(inflation|cpi) (?:surged?|rose|above|beat|hotter|persistent)/, base: 2, modifiers: true }
-        ],
-        bearish: [
-            { pattern: /(gdp|growth|payrolls|employment|jobs) (?:miss|below|disappoint|weak)/, base: -2, modifiers: true },
-            { pattern: /contraction/, base: -3, modifiers: true },
-            { pattern: /recession/, base: -3, modifiers: true },
-            { pattern: /(unemployment|jobless) (?:rose|rises|increase)/, base: -2, modifiers: true },
-            { pattern: /(?:below|miss) (?:expectation|forecast)/, base: -2, modifiers: true },
-            { pattern: /declining?/, base: -1, modifiers: true },
-            { pattern: /weaken\w+/, base: -1, modifiers: true },
-            { pattern: /slowing/, base: -1, modifiers: true }
-        ]
+      bullish: [
+        'beats forecast', 'beats estimates', 'better than expected', 'strong data',
+        'gdp growth', 'jobs growth', 'employment gains', 'pmi rises', 'retail sales up'
+      ],
+      bearish: [
+        'misses forecast', 'misses estimates', 'worse than expected', 'weak data',
+        'gdp contraction', 'job losses', 'unemployment rises', 'pmi falls', 'retail sales down'
+      ]
     },
     risk: {
-        bullish: [
-            { pattern: /(safe.?haven|flight to safety|risk.?off)/, base: 2, modifiers: false },
-            { pattern: /geopolit\w+ (?:tension|crisis)/, base: 2, modifiers: false },
-            { pattern: /(market|equity) (?:panic|sell.?off|declined?|pulled? back)/, base: 2, modifiers: false },
-            { pattern: /(military strike|supply disruption|escalat\w+|carry (?:trade )?unwind)/, base: 2, modifiers: false },
-            { pattern: /(volatility|uncertainty) (?:spike|jump|increase)/, base: 2, modifiers: false }
-        ],
-        bearish: [
-            { pattern: /risk.?on/, base: -2, modifiers: false },
-            { pattern: /risk appetite/, base: -1, modifiers: true },
-            { pattern: /(market|equity) (?:rallied?|gains?)/, base: -1, modifiers: true }
-        ]
+      bullish: [
+        'risk-on', 'stocks rally', 'equities rally', 'markets rebound', 'calmer markets'
+      ],
+      bearish: [
+        'risk-off', 'safe haven demand', 'geopolitical', 'war', 'conflict', 'crisis',
+        'stocks plunge', 'equities plunge', 'market turmoil', 'credit stress'
+      ]
     }
-};
+  };
 
-const INTENSITY_MODIFIERS = {
-    extreme: 1.5,
-    very: 1.3,
-    highly: 1.3,
-    significantly: 1.2,
-    moderately: 0.8,
-    slightly: 0.6,
-    somewhat: 0.7
-};
+  const CURRENCY_ALIASES = {
+    USD: ['usd', 'dollar', 'greenback', 'dxy', 'u.s. dollar', 'us dollar'],
+    EUR: ['eur', 'euro'],
+    GBP: ['gbp', 'pound', 'sterling'],
+    JPY: ['jpy', 'yen'],
+    AUD: ['aud', 'aussie', 'australian dollar'],
+    CAD: ['cad', 'loonie', 'canadian dollar'],
+    CHF: ['chf', 'swissy', 'swiss franc'],
+    NZD: ['nzd', 'kiwi', 'new zealand dollar']
+  };
 
-const CURRENCY_PATTERNS = {
-    USD: /\b(dollar|usd|greenback|dxy|fed|federal reserve|fomc|powell|us economy|us inflation|us gdp|nonfarm|nfp|us jobs|treasury|united states|american)\b/i,
-    EUR: /\b(euro|eur|ecb|european central bank|lagarde|eurozone|euro area|germany|german|france)\b/i,
-    GBP: /\b(pound|sterling|gbp|boe|bank of england|bailey|uk economy|uk gdp|uk|united kingdom|britain|british)\b/i,
-    JPY: /\b(yen|jpy|boj|bank of japan|ueda|japan economy|japan|japanese)\b/i,
-    AUD: /\b(aussie|aud|rba|reserve bank of australia|australia economy|australia|australian)\b/i,
-    CAD: /\b(loonie|cad|boc|bank of canada|canada economy|canada|canadian|oil|crude|wti|brent)\b/i,
-    CHF: /\b(franc|chf|snb|swiss national bank|switzerland|swiss)\b/i,
-    NZD: /\b(kiwi|nzd|rbnz|reserve bank of new zealand|new zealand)\b/i,
-    XAU: /\b(gold|xau|bullion)\b/i
-};
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
 
-const REGIME_THRESHOLDS = {
-    rateRegime: { monetary: 0.5 },
-    dataRegime: { economic: 0.5 },
-    crisisRegime: { risk: 0.4 }
-};
+  function biasFromScore(score) {
+    if (score > 0.75) return 'Strong Bullish';
+    if (score > 0.25) return 'Bullish';
+    if (score < -0.75) return 'Strong Bearish';
+    if (score < -0.25) return 'Bearish';
+    return 'Neutral';
+  }
 
-const REGIME_WEIGHTS = {
-    'Rate Regime': { monetary: 0.7, economic: 0.2, risk: 0.1 },
-    'Data Regime': { monetary: 0.2, economic: 0.7, risk: 0.1 },
-    'Crisis Regime': { monetary: 0.1, economic: 0.2, risk: 0.7 },
-    'Balanced Regime': { monetary: 0.4, economic: 0.4, risk: 0.2 }
-};
-
-const MAJOR_PAIRS = [
-    { pair: 'EUR/USD', base: 'EUR', quote: 'USD' },
-    { pair: 'GBP/USD', base: 'GBP', quote: 'USD' },
-    { pair: 'USD/JPY', base: 'USD', quote: 'JPY' },
-    { pair: 'USD/CHF', base: 'USD', quote: 'CHF' },
-    { pair: 'USD/CAD', base: 'USD', quote: 'CAD' },
-    { pair: 'AUD/USD', base: 'AUD', quote: 'USD' },
-    { pair: 'NZD/USD', base: 'NZD', quote: 'USD' },
-    { pair: 'EUR/GBP', base: 'EUR', quote: 'GBP' },
-    { pair: 'EUR/JPY', base: 'EUR', quote: 'JPY' },
-    { pair: 'GBP/JPY', base: 'GBP', quote: 'JPY' },
-    { pair: 'AUD/JPY', base: 'AUD', quote: 'JPY' },
-    { pair: 'CAD/JPY', base: 'CAD', quote: 'JPY' },
-    { pair: 'CHF/JPY', base: 'CHF', quote: 'JPY' },
-    { pair: 'XAU/USD', base: 'XAU', quote: 'USD' }
-];
-
-// ──────────────────────────────────────────────────────────────
-// 2. UTILITY FUNCTIONS
-// ──────────────────────────────────────────────────────────────
-
-function normalizeText(text) {
-    return text.toLowerCase().trim();
-}
-
-function detectIntensity(sentence, termIndex) {
-    const words = sentence.split(/\s+/);
-    const termPosition = sentence.substring(0, termIndex).split(/\s+/).length - 1;
-    
-    // Check 2 words before the term
-    for (let i = Math.max(0, termPosition - 2); i < termPosition; i++) {
-        const word = words[i];
-        if (INTENSITY_MODIFIERS[word]) {
-            return INTENSITY_MODIFIERS[word];
-        }
+  function detectCurrencies(textLower) {
+    const found = new Set();
+    for (const [ccy, aliases] of Object.entries(CURRENCY_ALIASES)) {
+      if (aliases.some(a => textLower.includes(a))) found.add(ccy);
     }
-    return 1.0;
-}
 
-function extractSentences(text) {
-    // Split on sentence boundaries while preserving structure
-    return text
-        .split(/[.!?]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 10);
-}
+    // If no explicit currency mention, default to USD so the engine still returns something.
+    if (found.size === 0) found.add('USD');
 
-function clampScore(score, min = -3, max = 3) {
-    return Math.max(min, Math.min(max, score));
-}
+    return Array.from(found);
+  }
 
-// ──────────────────────────────────────────────────────────────
-// 3. DRIVER EXTRACTION
-// ──────────────────────────────────────────────────────────────
+  function countMatches(textLower, arr) {
+    let n = 0;
+    for (const k of arr) if (textLower.includes(k)) n++;
+    return n;
+  }
 
-/**
- * Extract monetary, economic, and risk drivers from article text
- * @param {string} articleText - Full article title + body
- * @returns {Array} Array of driver objects with currency, category, rawScore
- */
-function extractDrivers(articleText) {
-    const normalized = normalizeText(articleText);
-    const sentences = extractSentences(normalized);
+  function extractDrivers(articleText) {
+    const textLower = String(articleText || '').toLowerCase();
+    const currencies = detectCurrencies(textLower);
+
     const drivers = [];
-    const processedSentences = new Set();
 
-    // Detect which currencies are mentioned
-    const mentionedCurrencies = CURRENCY_UNIVERSE.filter(currency => 
-        CURRENCY_PATTERNS[currency].test(normalized)
-    );
+    for (const [category, sets] of Object.entries(KEYWORDS)) {
+      const bullHits = countMatches(textLower, sets.bullish);
+      const bearHits = countMatches(textLower, sets.bearish);
 
-    // If no currencies detected, return empty
-    if (mentionedCurrencies.length === 0) {
-        return drivers;
-    }
+      if (bullHits === 0 && bearHits === 0) continue;
 
-    // Process each category
-    for (const [category, directions] of Object.entries(SIGNAL_PATTERNS)) {
-        for (const direction of ['bullish', 'bearish']) {
-            for (const signal of directions[direction]) {
-                // Find all occurrences in text using regex
-                let match;
-                const globalPattern = new RegExp(signal.pattern.source, 'gi');
-                
-                while ((match = globalPattern.exec(normalized)) !== null) {
-                    // Find which sentence this occurs in
-                    const sentenceIndex = sentences.findIndex(s => {
-                        const sStart = normalized.indexOf(s);
-                        const sEnd = sStart + s.length;
-                        return sStart <= match.index && match.index < sEnd;
-                    });
-                    
-                    if (sentenceIndex === -1) continue;
-                    
-                    const sentenceKey = `${sentenceIndex}-${signal.pattern.source}`;
-                    
-                    // Skip if already processed (prevents duplicate stacking)
-                    if (processedSentences.has(sentenceKey)) continue;
-                    processedSentences.add(sentenceKey);
+      // Determine the sign of the driver signal.
+      // If both hit, whichever is larger wins; tie -> neutral (ignored).
+      let rawScore = 0;
+      if (bullHits > bearHits) rawScore = +1;
+      else if (bearHits > bullHits) rawScore = -1;
+      else rawScore = 0;
 
-                    const sentence = sentences[sentenceIndex];
-                    
-                    // Apply intensity modifier if enabled
-                    let finalScore = signal.base;
-                    if (signal.modifiers) {
-                        const intensity = detectIntensity(sentence, match.index - normalized.indexOf(sentence));
-                        finalScore = signal.base * intensity;
-                    }
-                    
-                    // Clamp to -3/+3 range
-                    finalScore = clampScore(finalScore);
+      if (rawScore === 0) continue;
 
-                    // Assign to mentioned currencies in this sentence
-                    for (const currency of mentionedCurrencies) {
-                        if (CURRENCY_PATTERNS[currency].test(sentence)) {
-                            drivers.push({
-                                currency,
-                                category: category.charAt(0).toUpperCase() + category.slice(1),
-                                rawScore: parseFloat(finalScore.toFixed(2)),
-                                signal: match[0] // Include matched text for debugging
-                            });
-                        }
-                    }
-                }
-            }
-        }
+      // Apply same driver to each detected currency.
+      // (Keeps scoring deterministic and simple.)
+      for (const ccy of currencies) {
+        drivers.push({
+          currency: ccy,
+          category: category[0].toUpperCase() + category.slice(1),
+          rawScore,
+          signal:
+            rawScore > 0
+              ? (category === 'monetary' ? 'hawkish / tightening' : category === 'economic' ? 'better data' : 'risk-on')
+              : (category === 'monetary' ? 'dovish / easing' : category === 'economic' ? 'weaker data' : 'risk-off')
+        });
+      }
     }
 
     return drivers;
-}
+  }
 
-// ──────────────────────────────────────────────────────────────
-// 4. REGIME DETECTION
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Detect market regime from drivers
- * @param {Array} drivers - Array of driver objects
- * @returns {Object} { regime: string, weights: object }
- */
-function detectRegime(drivers) {
-    if (drivers.length === 0) {
-        return {
-            regime: 'Balanced Regime',
-            weights: REGIME_WEIGHTS['Balanced Regime']
-        };
+  function detectRegime(drivers) {
+    const counts = { Monetary: 0, Economic: 0, Risk: 0 };
+    for (const d of drivers || []) {
+      if (counts[d.category] !== undefined) counts[d.category]++;
     }
 
-    // Count drivers by category
-    const categoryCounts = {
-        Monetary: 0,
-        Economic: 0,
-        Risk: 0
-    };
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const [topCat, topCount] = entries[0];
 
-    drivers.forEach(d => {
-        categoryCounts[d.category] = (categoryCounts[d.category] || 0) + 1;
-    });
+    let regime = 'Balanced Regime';
+    if (topCount >= 2 && topCat === 'Monetary') regime = 'Rate Regime';
+    else if (topCount >= 2 && topCat === 'Economic') regime = 'Data Regime';
+    else if (topCount >= 2 && topCat === 'Risk') regime = 'Crisis Regime';
 
-    const total = drivers.length;
-    const proportions = {
-        monetary: categoryCounts.Monetary / total,
-        economic: categoryCounts.Economic / total,
-        risk: categoryCounts.Risk / total
-    };
+    // Weights mirror the guide: dominant theme gets higher weight.
+    let weights;
+    if (regime === 'Rate Regime') weights = { monetary: 0.7, economic: 0.2, risk: 0.1 };
+    else if (regime === 'Data Regime') weights = { monetary: 0.2, economic: 0.7, risk: 0.1 };
+    else if (regime === 'Crisis Regime') weights = { monetary: 0.15, economic: 0.15, risk: 0.7 };
+    else weights = { monetary: 0.34, economic: 0.33, risk: 0.33 };
 
-    // Apply regime rules
-    if (proportions.monetary > REGIME_THRESHOLDS.rateRegime.monetary) {
-        return {
-            regime: 'Rate Regime',
-            weights: REGIME_WEIGHTS['Rate Regime']
-        };
-    }
-    
-    if (proportions.economic > REGIME_THRESHOLDS.dataRegime.economic) {
-        return {
-            regime: 'Data Regime',
-            weights: REGIME_WEIGHTS['Data Regime']
-        };
-    }
-    
-    if (proportions.risk > REGIME_THRESHOLDS.crisisRegime.risk) {
-        return {
-            regime: 'Crisis Regime',
-            weights: REGIME_WEIGHTS['Crisis Regime']
-        };
-    }
+    return { regime, weights };
+  }
 
-    return {
-        regime: 'Balanced Regime',
-        weights: REGIME_WEIGHTS['Balanced Regime']
-    };
-}
-
-// ──────────────────────────────────────────────────────────────
-// 5. CURRENCY SCORING
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Compute weighted currency scores
- * @param {Array} drivers - Array of driver objects
- * @param {Object} weights - Regime weights { monetary, economic, risk }
- * @returns {Object} Currency scores { USD: 0.3, EUR: -1.2, ... }
- */
-function computeCurrencyScores(drivers, weights) {
-    // Initialize all currencies to 0
+  function computeCurrencyScores(drivers, weights) {
     const scores = {};
-    CURRENCY_UNIVERSE.forEach(currency => {
-        scores[currency] = 0;
-    });
+    for (const c of CURRENCIES) scores[c] = 0;
 
-    // Aggregate scores by currency and category
-    const aggregated = {};
-    
-    drivers.forEach(driver => {
-        const { currency, category, rawScore } = driver;
-        
-        if (!aggregated[currency]) {
-            aggregated[currency] = { Monetary: 0, Economic: 0, Risk: 0 };
-        }
-        
-        aggregated[currency][category] += rawScore;
-    });
+    for (const d of drivers || []) {
+      const w =
+        d.category === 'Monetary' ? (weights.monetary ?? 0.33) :
+        d.category === 'Economic' ? (weights.economic ?? 0.33) :
+        (weights.risk ?? 0.33);
 
-    // Apply weighted formula
-    for (const [currency, categoryScores] of Object.entries(aggregated)) {
-        const weightedScore = 
-            (categoryScores.Monetary * weights.monetary) +
-            (categoryScores.Economic * weights.economic) +
-            (categoryScores.Risk * weights.risk);
-        
-        scores[currency] = parseFloat(weightedScore.toFixed(2));
+      scores[d.currency] = (scores[d.currency] || 0) + d.rawScore * w;
     }
 
-    return scores;
-}
-
-// ──────────────────────────────────────────────────────────────
-// 6. PRIMARY PAIR DETECTION
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Detect primary currency pair from article
- * @param {string} articleText - Full article text
- * @param {Object} currencyScores - Currency scores object
- * @returns {string} Primary pair (e.g., "EUR/USD")
- */
-function detectPrimaryPair(articleText, currencyScores) {
-    const normalized = normalizeText(articleText);
-
-    // 1. Check for explicit pair mentions
-    const explicitPairs = [
-        'eur/usd', 'eurusd',
-        'gbp/usd', 'gbpusd',
-        'usd/jpy', 'usdjpy',
-        'aud/usd', 'audusd',
-        'usd/cad', 'usdcad',
-        'nzd/usd', 'nzdusd',
-        'usd/chf', 'usdchf',
-        'xau/usd', 'xauusd'
-    ];
-
-    for (const pairStr of explicitPairs) {
-        if (normalized.includes(pairStr)) {
-            // Convert to standard format
-            const standardized = pairStr.replace('usd', '/usd').replace('jpy', '/jpy').toUpperCase();
-            return standardized.includes('/') ? standardized : 
-                   standardized.substring(0, 3) + '/' + standardized.substring(3);
-        }
+    // Clamp to the guide’s stated range.
+    for (const k of Object.keys(scores)) {
+      scores[k] = clamp(+scores[k].toFixed(2), -3, 3);
     }
 
-    // 2. Gold mentioned → XAU/USD
-    if (/\b(gold|xau|bullion)\b/i.test(normalized)) {
-        return 'XAU/USD';
+    // Remove currencies that never appeared (keeps UI cleaner)
+    // but keep USD if everything is empty.
+    const nonZero = Object.entries(scores).filter(([, v]) => Math.abs(v) > 0.01);
+    if (nonZero.length === 0) return { USD: 0 };
+
+    const compact = {};
+    for (const [k, v] of nonZero) compact[k] = v;
+    return compact;
+  }
+
+  function generatePairMatrix(currencyScores) {
+    const matrix = [];
+    for (const [pair, base, quote] of PAIRS) {
+      const b = currencyScores[base] ?? 0;
+      const q = currencyScores[quote] ?? 0;
+      const score = +(b - q).toFixed(2);
+      matrix.push({ pair, score, bias: biasFromScore(score) });
     }
+    return matrix;
+  }
 
-    // 3. Central bank mentioned → currency vs USD
-    const centralBanks = {
-        'ecb': 'EUR/USD',
-        'european central bank': 'EUR/USD',
-        'lagarde': 'EUR/USD',
-        'boe': 'GBP/USD',
-        'bank of england': 'GBP/USD',
-        'bailey': 'GBP/USD',
-        'boj': 'USD/JPY',
-        'bank of japan': 'USD/JPY',
-        'ueda': 'USD/JPY',
-        'rba': 'AUD/USD',
-        'reserve bank of australia': 'AUD/USD',
-        'boc': 'USD/CAD',
-        'bank of canada': 'USD/CAD',
-        'rbnz': 'NZD/USD',
-        'reserve bank of new zealand': 'NZD/USD',
-        'snb': 'USD/CHF',
-        'swiss national bank': 'USD/CHF'
-    };
+  function detectPrimaryPair(_articleText, currencyScores) {
+    const rankedPairs = generatePairMatrix(currencyScores)
+      .sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
 
-    for (const [term, pair] of Object.entries(centralBanks)) {
-        if (normalized.includes(term)) {
-            return pair;
-        }
-    }
+    const top = rankedPairs[0];
+    if (!top) return null;
 
-    // 4. Dominant currency (highest absolute score) vs USD
-    const sortedCurrencies = Object.entries(currencyScores)
-        .filter(([curr]) => curr !== 'USD')
-        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    return { name: top.pair, score: top.score, bias: top.bias };
+  }
 
-    if (sortedCurrencies.length > 0) {
-        const dominant = sortedCurrencies[0][0];
-        
-        // Check if USD-quote or USD-base
-        if (['JPY', 'CHF', 'CAD'].includes(dominant)) {
-            return `USD/${dominant}`;
-        }
-        return `${dominant}/USD`;
-    }
-
-    // Default fallback
-    return 'EUR/USD';
-}
-
-// ──────────────────────────────────────────────────────────────
-// 7. PAIR MATRIX GENERATION
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Generate bias classification from score
- * @param {number} score - Pair score
- * @returns {string} Bias classification
- */
-function classifyBias(score) {
-    if (score >= 0.75) return 'Strong Bullish';
-    if (score >= 0.25) return 'Bullish';
-    if (score >= -0.25) return 'Neutral';
-    if (score >= -0.75) return 'Bearish';
-    return 'Strong Bearish';
-}
-
-/**
- * Generate projections for all major pairs
- * @param {Object} currencyScores - Currency scores
- * @returns {Array} Sorted array of pair projections
- */
-function generatePairMatrix(currencyScores) {
-    const pairProjections = [];
-
-    for (const { pair, base, quote } of MAJOR_PAIRS) {
-        const baseScore = currencyScores[base] || 0;
-        const quoteScore = currencyScores[quote] || 0;
-        const pairScore = parseFloat((baseScore - quoteScore).toFixed(2));
-        const bias = classifyBias(pairScore);
-
-        pairProjections.push({
-            pair,
-            score: pairScore,
-            bias
-        });
-    }
-
-    // Sort by absolute score descending
-    return pairProjections.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
-}
-
-// ──────────────────────────────────────────────────────────────
-// 8. MAIN ORCHESTRATOR
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Main sentiment analysis function
- * @param {string} articleText - Full article title + body
- * @returns {Object} Complete analysis result
- */
-function analyzeSentiment(articleText) {
-    // Step 1: Extract drivers
+  function analyzeSentiment(articleText) {
     const drivers = extractDrivers(articleText);
-
-    // Step 2: Detect regime
     const { regime, weights } = detectRegime(drivers);
-
-    // Step 3: Compute currency scores
     const currencyScores = computeCurrencyScores(drivers, weights);
+    const primaryPair = detectPrimaryPair(articleText, currencyScores);
+    const rankedPairs = generatePairMatrix(currencyScores)
+      .sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
 
-    // Step 4: Detect primary pair
-    const primaryPairName = detectPrimaryPair(articleText, currencyScores);
-
-    // Step 5: Generate pair matrix
-    const rankedPairs = generatePairMatrix(currencyScores);
-
-    // Step 6: Find primary pair details
-    const primaryPair = rankedPairs.find(p => p.pair === primaryPairName) || rankedPairs[0];
-
-    // Return structured JSON
     return {
-        regime,
-        weights,
-        currencyScores,
-        primaryPair: {
-            name: primaryPair.pair,
-            score: primaryPair.score,
-            bias: primaryPair.bias
-        },
-        rankedPairs,
-        drivers // Include for debugging/transparency
+      regime,
+      weights,
+      currencyScores,
+      primaryPair,
+      rankedPairs,
+      drivers
     };
-}
+  }
 
-// ──────────────────────────────────────────────────────────────
-// 9. EXPORTS
-// ──────────────────────────────────────────────────────────────
-
-// For ES6 modules
-export {
+  return {
+    analyzeSentiment,
     extractDrivers,
     detectRegime,
     computeCurrencyScores,
     detectPrimaryPair,
-    generatePairMatrix,
-    analyzeSentiment
-};
-
-// For Node.js / CommonJS (if needed)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        extractDrivers,
-        detectRegime,
-        computeCurrencyScores,
-        detectPrimaryPair,
-        generatePairMatrix,
-        analyzeSentiment
-    };
-}
-
-// For browser global (if needed)
-if (typeof window !== 'undefined') {
-    window.SentimentEngine = {
-        extractDrivers,
-        detectRegime,
-        computeCurrencyScores,
-        detectPrimaryPair,
-        generatePairMatrix,
-        analyzeSentiment
-    };
-}
+    generatePairMatrix
+  };
+});
